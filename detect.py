@@ -18,57 +18,58 @@ mp_drawing = mp.solutions.drawing_utils
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 
+# ブレを判定するスレッショルド値
+THRESHOLD = 5  # フレーム間での許容移動距離（例: 10ピクセル）
+
 def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_landmark, output_dir_pos):
-    # 動画ファイル名を取得（拡張子を除く）
     video_name = os.path.splitext(os.path.basename(video_path))[0]
-    
-    # 画像ファイルとJSONファイルの保存先
+
     save_frame_dir = os.path.join(output_dir_frmae, f'{video_name}_frames')
     save_angle_path = os.path.join(output_dir_angle, f'{video_name}.json')
     save_landmark_dir = os.path.join(output_dir_landmark, f'{video_name}_landmarks')
     save_pos_path = os.path.join(output_dir_pos, f'{video_name}.json')
 
-    # もし既存のjsonファイルがある場合は削除
     if os.path.exists(save_angle_path):
         os.remove(save_angle_path)
     if os.path.exists(save_pos_path):
         os.remove(save_pos_path)
     
-    # ディレクトリの作成
     os.makedirs(save_frame_dir, exist_ok=True)
     os.makedirs(output_dir_angle, exist_ok=True)
     os.makedirs(save_landmark_dir, exist_ok=True)
     os.makedirs(output_dir_pos, exist_ok=True)
 
-    # JSONデータのリスト
     angles_data = []
     pos_data = []
 
-    # 動画の読み込み
     cap = cv2.VideoCapture(video_path)
     frame_count = 0
+    prev_pos_r, prev_pos_l = None, None  # 前フレームの座標を保持する変数
+
     while True:
         ret, frame = cap.read()
         if not ret: break
 
-        # ランドマークのDataFrameとアノテーション有無の画像を取得
         height, width, _ = frame.shape
         pos_r, pos_l, landmark_bgr = landmark(frame, height, width)
-        # 画像を整形
-        # PILのImageオブジェクトに変換するのではなく、NumPy配列として保持
-        landmark_image = landmark_bgr.astype(np.uint8)  # NumPy配列として保持
 
+        # 前フレームと比較してブレをチェック
+        if prev_pos_r is not None and prev_pos_l is not None:
+            diff_r = np.nanmax(np.linalg.norm(pos_r - prev_pos_r, axis=1))
+            diff_l = np.nanmax(np.linalg.norm(pos_l - prev_pos_l, axis=1))
+            if diff_r > THRESHOLD or diff_l > THRESHOLD:
+                print(f'Skipping frame {frame_count} due to excessive movement.')
+                frame_count += 1
+                prev_pos_r, prev_pos_l = pos_r, pos_l  # 次のフレームのために現在の座標を保存
+                continue  # このフレームの処理をスキップ
 
-        # 指の角度計算
         degree_r, degree_l, rad_r, rad_l = angle(pos_r, pos_l)
 
-        # NaNが含まれているかをチェック
         if np.any(np.isnan(pos_r)) or np.any(np.isnan(pos_l)) or np.any(np.isnan(degree_r)) or np.any(np.isnan(degree_l)):
             print(f'Skipping frame {frame_count} due to NaN values.')
             frame_count += 1
-            continue  # フレームをスキップ
+            continue
 
-        # 角度情報を保存
         angle_info = {
             "frame": frame_count,
             "right_hand_angle": degree_r,
@@ -76,7 +77,6 @@ def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_lan
         }
         angles_data.append(angle_info)
 
-        #座標情報を保存
         pos_info = {
             "frame": frame_count,
             "right_hand_pos": pos_r.tolist(),
@@ -84,21 +84,18 @@ def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_lan
         }
         pos_data.append(pos_info)
 
-        # フレーム画像を保存
         frame_filename = os.path.join(save_frame_dir, f"{video_name}_{frame_count:04d}.jpg")
         cv2.imwrite(frame_filename, frame)
 
-        #ランドマーク描画された画像を保存
         landmark_filename = os.path.join(save_landmark_dir, f"{video_name}_{frame_count:04d}.jpg")
-        cv2.imwrite(landmark_filename, landmark_image)
+        cv2.imwrite(landmark_filename, landmark_bgr.astype(np.uint8))
 
         frame_count += 1
+        prev_pos_r, prev_pos_l = pos_r, pos_l  # 現在の座標を保存して次のフレームへ
 
-    # JSONファイルに角度データを書き込む
     with open(save_angle_path, 'w') as json_file:
         json.dump(angles_data, json_file, indent=4)
 
-    # JSONファイルに座標データを書き込む
     with open(save_pos_path, 'w') as json_file:
         json.dump(pos_data, json_file, indent=4)
 
