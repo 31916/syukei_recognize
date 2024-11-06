@@ -1,6 +1,7 @@
 import json
 import numpy as np
 import os
+import random
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import Sequential
@@ -36,8 +37,14 @@ def main():
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
+            # データが5つ未満の場合はそのまま使用
+            if len(data) > 5:
+                sampled_data = random.sample(data, 5)  # 5つのデータのみをランダムに抽出
+            else:
+                sampled_data = data  # 5つ未満ならそのまま使用
+
             # 右手と左手の角度を取得
-            for entry in data:
+            for entry in sampled_data:
                 right_hand_angles.append(entry['right_hand_angle'])
                 left_hand_angles.append(entry['left_hand_angle'])
                 labels.append(hand_shape_label)  # 手形番号をラベルとして追加
