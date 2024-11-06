@@ -19,7 +19,7 @@ drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 
 # ブレを判定するスレッショルド値
-THRESHOLD = 5  # フレーム間での許容移動距離（例: 10ピクセル）
+THRESHOLD = 8  # フレーム間での許容移動距離（例: 10ピクセル）
 
 def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_landmark, output_dir_pos):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
