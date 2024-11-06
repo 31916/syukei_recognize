@@ -113,7 +113,7 @@ def main():
     # 結果をJSON形式で保存（outputディレクトリ内に保存）
     output_dir = './do/data/output'  # outputディレクトリを指定
     os.makedirs(output_dir, exist_ok=True)  # ディレクトリが存在しない場合は作成
-    output_path = os.path.join(output_dir, "crossValidationResults.json")
+    output_path = os.path.join(output_dir, "cross.json")
 
     with open(output_path, "w", encoding='utf-8') as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
