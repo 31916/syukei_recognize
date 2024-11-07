@@ -19,6 +19,12 @@ def create_model(input_shape, num_classes):
     model.add(Dense(num_classes, activation='softmax'))
     return model
 
+# データに無効な値が含まれているか確認
+def check_invalid_values(data, name="Data"):
+    if np.any(np.isnan(data)) or np.any(np.isinf(data)):
+        print(f"Warning: {name} contains NaN or Inf values.")
+        # 必要に応じてデータをクリアや修正できます
+
 def main():
     # JSONファイルが保存されているディレクトリのパス
     data_dir = r'./do/data/output/angle'
@@ -78,6 +84,12 @@ def main():
             
             X_train_k, X_val_k = X[train_index], X[val_index]
             Y_train_k, Y_val_k = Y_one_hot[train_index], Y_one_hot[val_index]
+
+            # 訓練データとバリデーションデータで無効な値をチェック
+            check_invalid_values(X_train_k, name="X_train_k")
+            check_invalid_values(X_val_k, name="X_val_k")
+            check_invalid_values(Y_train_k, name="Y_train_k")
+            check_invalid_values(Y_val_k, name="Y_val_k")
 
             # モデルの構築と訓練
             model = create_model(input_shape=(X.shape[1],), num_classes=Y_one_hot.shape[1])
