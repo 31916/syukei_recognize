@@ -39,8 +39,8 @@ def main():
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # データが5つ未満の場合はそのまま使用
-            sampled_data = data[:5] if len(data) >= 5 else data
+            # データが10個以上ある場合、ランダムに10個選ぶ
+            sampled_data = np.random.choice(data, size=20, replace=False).tolist() if len(data) >= 20 else data
 
             # 右手と左手の角度と被験者IDを取得
             for entry in sampled_data:
@@ -112,7 +112,7 @@ def main():
     # 結果をJSON形式で保存
     output_dir = './do/data/output'
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "cross.json")
+    output_path = os.path.join(output_dir, "cross20.json")
 
     with open(output_path, "w", encoding='utf-8') as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
