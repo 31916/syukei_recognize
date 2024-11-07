@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import os
-from sklearn.model_selection import KFold, GroupKFold
+from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input, Dropout
@@ -39,8 +39,8 @@ def main():
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # データが10個以上ある場合、ランダムに10個選ぶ
-            sampled_data = np.random.choice(data, size=10, replace=False).tolist() if len(data) >= 10 else data
+            # ランダムに10個のデータをサンプリング
+            sampled_data = np.random.choice(data, 20, replace=False) if len(data) >= 20 else data
 
             # 右手と左手の角度と被験者IDを取得
             for entry in sampled_data:
@@ -64,17 +64,16 @@ def main():
     group_kfold = GroupKFold(n_splits=5)
 
     # 結果を保存するための辞書
-    right_hand_results = {'accuracies': [], 'label_accuracy': {}}
-    left_hand_results = {'accuracies': [], 'label_accuracy': {}}
+    results = {'right_hand': [], 'left_hand': [], 'fold_accuracies': []}
+    label_accuracy = {label: [] for label in label_encoder.classes_}
 
     # 右手と左手で別々にモデルを作成・検証
-    for hand, X, results in zip(['right_hand', 'left_hand'], [X_right, X_left], [right_hand_results, left_hand_results]):
-        print(f'Processing {hand} angles...')  # 右手または左手を処理していることを表示
+    for hand, X in zip(['right_hand', 'left_hand'], [X_right, X_left]):
+        print(f'Processing {hand} angles...')
         accuracies = []
-
-        for fold, (train_index, val_index) in enumerate(group_kfold.split(X, Y_one_hot, groups), 1):
-            print(f'  Fold {fold}: Training and evaluating...')  # 現在のfoldの推定処理を表示
-            
+        fold_accuracies = []  # 各foldの精度を記録
+        for fold_idx, (train_index, val_index) in enumerate(group_kfold.split(X, Y_one_hot, groups)):
+            print(f"  Fold {fold_idx+1}: Training and evaluating the model...")
             X_train_k, X_val_k = X[train_index], X[val_index]
             Y_train_k, Y_val_k = Y_one_hot[train_index], Y_one_hot[val_index]
 
@@ -85,18 +84,16 @@ def main():
 
             # バリデーションセットでの評価
             score = model.evaluate(X_val_k, Y_val_k, verbose=0)[1]
-            print(f'*** {hand}  {fold}: {score*100}% ***')
             accuracies.append(score)
+            fold_accuracies.append(score)  # 各foldの精度を保存
 
-            # 各ラベルの精度を計算
+            # 各ラベル（手形）についての精度を計算
             Y_val_encoded = np.argmax(Y_val_k, axis=1)
             predictions = np.argmax(model.predict(X_val_k), axis=1)
 
             for label in label_encoder.classes_:
                 label_indices = np.where(Y_val_encoded == label_encoder.transform([label])[0])[0]
-                if label not in results['label_accuracy']:
-                    results['label_accuracy'][label] = []
-                results['label_accuracy'][label].append(np.mean(predictions[label_indices] == label_encoder.transform([label])[0]))
+                label_accuracy[label].append(np.mean(predictions[label_indices] == label_encoder.transform([label])[0]))
 
         # 平均精度と標準偏差の計算
         mean_accuracy = np.mean(accuracies)
@@ -104,24 +101,30 @@ def main():
         confidence_interval = stats.t.interval(0.95, len(accuracies)-1, loc=mean_accuracy, scale=stats.sem(accuracies))
 
         # 結果を保存
-        results['accuracies'].append({
+        results[hand].append({
             'mean_accuracy': mean_accuracy,
             'std_accuracy': std_accuracy,
             'confidence_interval': [confidence_interval[0], confidence_interval[1]]
         })
 
+        # foldごとの精度の平均を計算
+        fold_mean_accuracy = np.mean(fold_accuracies)
+        results['fold_accuracies'].append({
+            'hand': hand,
+            'fold_accuracies': fold_accuracies,
+            'fold_mean_accuracy': fold_mean_accuracy
+        })
+
+    # ラベル（手形）ごとの精度を追加
+    results['label_accuracy'] = {label: np.mean(accuracies) for label, accuracies in label_accuracy.items()}
+
     # 結果をJSON形式で保存
     output_dir = './do/data/output'
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "right_hand_accuracy.json")
+    output_path = os.path.join(output_dir, "cross20.json")
 
     with open(output_path, "w", encoding='utf-8') as f:
-        json.dump(right_hand_results, f, indent=4, ensure_ascii=False)
-
-    output_path_left = os.path.join(output_dir, "left_hand_accuracy.json")
-
-    with open(output_path_left, "w", encoding='utf-8') as f:
-        json.dump(left_hand_results, f, indent=4, ensure_ascii=False)
+        json.dump(results, f, indent=4, ensure_ascii=False)
 
 if __name__ == '__main__':
     main()
