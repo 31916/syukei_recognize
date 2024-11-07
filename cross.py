@@ -71,9 +71,11 @@ def main():
     for hand, X in zip(['right_hand', 'left_hand'], [X_right, X_left]):
         print(f'Processing {hand} angles...')
         accuracies = []
-        fold_accuracies = []  # 各foldの精度を記録
-        for fold_idx, (train_index, val_index) in enumerate(group_kfold.split(X, Y_one_hot, groups)):
-            print(f"  Fold {fold_idx+1}: Training and evaluating the model...")
+
+        # 各foldでの処理
+        for fold, (train_index, val_index) in enumerate(group_kfold.split(X, Y_one_hot, groups), 1):
+            print(f"  Fold {fold}: Training and evaluating the model...")
+            
             X_train_k, X_val_k = X[train_index], X[val_index]
             Y_train_k, Y_val_k = Y_one_hot[train_index], Y_one_hot[val_index]
 
@@ -84,16 +86,19 @@ def main():
 
             # バリデーションセットでの評価
             score = model.evaluate(X_val_k, Y_val_k, verbose=0)[1]
-            accuracies.append(score)
-            fold_accuracies.append(score)  # 各foldの精度を保存
+            print(f"  Fold {fold}: Validation accuracy: {score*100:.2f}%")
 
-            # 各ラベル（手形）についての精度を計算
+            accuracies.append(score)
+
+            # 各ラベルの精度を計算
             Y_val_encoded = np.argmax(Y_val_k, axis=1)
             predictions = np.argmax(model.predict(X_val_k), axis=1)
 
+            # 各hand_shape_labelの精度を表示
             for label in label_encoder.classes_:
                 label_indices = np.where(Y_val_encoded == label_encoder.transform([label])[0])[0]
                 label_accuracy[label].append(np.mean(predictions[label_indices] == label_encoder.transform([label])[0]))
+                print(f"    Label {label}: Accuracy: {np.mean(predictions[label_indices] == label_encoder.transform([label])[0])*100:.2f}%")
 
         # 平均精度と標準偏差の計算
         mean_accuracy = np.mean(accuracies)
@@ -104,16 +109,11 @@ def main():
         results[hand].append({
             'mean_accuracy': mean_accuracy,
             'std_accuracy': std_accuracy,
-            'confidence_interval': [confidence_interval[0], confidence_interval[1]]
+            'confidence_interval': [confidence_interval[0], confidence_interval[1]],
+            'fold_accuracies': accuracies,  # 各foldごとの精度を保存
+            'fold_mean_accuracy': mean_accuracy  # fold平均精度
         })
 
-        # foldごとの精度の平均を計算
-        fold_mean_accuracy = np.mean(fold_accuracies)
-        results['fold_accuracies'].append({
-            'hand': hand,
-            'fold_accuracies': fold_accuracies,
-            'fold_mean_accuracy': fold_mean_accuracy
-        })
 
     # ラベル（手形）ごとの精度を追加
     results['label_accuracy'] = {label: np.mean(accuracies) for label, accuracies in label_accuracy.items()}
