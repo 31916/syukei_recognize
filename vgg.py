@@ -1,21 +1,41 @@
-from tensorflow.keras.applications import VGG16
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.layers import Dense, Flatten
-from tensorflow.keras.models import Model
+import numpy as np
+import matplotlib.pyplot as plt
+%matplotlib inline 
 
-# 事前学習済みのVGG16をロード
-model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+import os
+import math
+import urllib.request
+import zipfile
 
-# VGG16に全結合層を追加
-x = model.output
-x = Flatten()(x)
-x = Dense(256, activation='relu')(x)
-predictions = Dense(num_classes, activation='softmax')(x)
-model_final = Model(inputs=model.input, outputs=predictions)
+from keras.models import Sequential, load_model, Model
+from keras.layers import Conv2D, MaxPooling2D, Dropout, Flatten, Dense
+from keras.layers import Activation, BatchNormalization, Input
+from keras.optimizers import adam_v2, sgd_experimental
+from keras.utils import np_utils
+from keras.callbacks import EarlyStopping
+from keras.applications.vgg16 import VGG16
+from keras.preprocessing.image import ImageDataGenerator
 
-# コンパイル
-model_final.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+from google.colab import files
 
-# 学習
-model_final.fit(train_data, train_labels, epochs=10, batch_size=32, validation_data=(val_data, val_labels))
+# ディレクトリのパス
+train_dir = "./dataset/trainData"
+valid_dir = "./dataset/validData"
+all_data_dir = "./tmp/Data"
+source_dir = "./tmp/trainData"
+
+# ディレクトリ下のデータ置き場所
+os.makedirs("%s/dogs" %train_dir)
+os.makedirs("%s/cats" %train_dir)
+os.makedirs("%s/dogs" %valid_dir)
+os.makedirs("%s/cats" %valid_dir)
+os.makedirs("%s" %all_data_dir)
+os.makedirs("%s" %source_dir)
+
+# ファイルをアップロード
+uploaded = files.upload()
+
+# keyに対する処理
+for fn in uploaded.keys():
+  print('User uploaded file "{name}" with length {length} bytes'.format(name=fn, length=len(uploaded[fn])))
+!mkdir -p ~/.kaggle/ && mv kaggle.json ~/.kaggle/ && chmod 600 ~/.kaggle/kaggle.json
