@@ -1,7 +1,6 @@
 import mediapipe as mp
 import cv2
 import numpy as np
-import pandas as pd
 import os
 import json
 import glob
@@ -17,9 +16,8 @@ holistic = mp_holistic.Holistic(
 mp_drawing = mp.solutions.drawing_utils
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
-
 # ブレを判定するスレッショルド値
-THRESHOLD = 8  # フレーム間での許容移動距離（例: 10ピクセル）
+THRESHOLD = 8  # フレーム間での許容移動距離
 
 def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_landmark, output_dir_pos):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -63,7 +61,7 @@ def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_lan
                 prev_pos_r, prev_pos_l = pos_r, pos_l  # 次のフレームのために現在の座標を保存
                 continue  # このフレームの処理をスキップ
 
-        degree_r, degree_l, rad_r, rad_l = angle(pos_r, pos_l)
+        degree_r, degree_l, rad_r, rad_l, orientation_r, orientation_l = angle(pos_r, pos_l)
 
         if np.any(np.isnan(pos_r)) or np.any(np.isnan(pos_l)) or np.any(np.isnan(degree_r)) or np.any(np.isnan(degree_l)):
             print(f'Skipping frame {frame_count} due to NaN values.')
@@ -72,15 +70,15 @@ def process_video(video_path, output_dir_frmae, output_dir_angle, output_dir_lan
 
         angle_info = {
             "frame": frame_count,
-            "right_hand_angle": degree_r,
-            "left_hand_angle": degree_l
+            "right_hand_info": degree_r + [orientation_r],
+            "left_hand_info": degree_l + [orientation_l]
         }
         angles_data.append(angle_info)
 
         pos_info = {
             "frame": frame_count,
             "right_hand_pos": pos_r.tolist(),
-            "left_hand_pos" : pos_l.tolist()
+            "left_hand_pos": pos_l.tolist()
         }
         pos_data.append(pos_info)
 
@@ -228,9 +226,12 @@ def angle(pos_r, pos_l):
         #弧度法
         rad_l.append(np.arccos(cos))
 
+    # 手のひらの向きの判定
+    orientation_r = 0 if pos_r[0][0] > pos_r[4][0] else 1  # 手のひらが上 (0) or 下 (1)
+    orientation_l = 0 if pos_l[0][0] > pos_l[4][0] else 1  # 手のひらが上 (0) or 下 (1)
 
-    return degree_r, degree_l, rad_r, rad_l
+    return degree_r, degree_l, rad_r, rad_l, orientation_r, orientation_l
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
