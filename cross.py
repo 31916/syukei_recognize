@@ -65,12 +65,20 @@ def main():
 
             # 右手と左手の角度を取得
             for entry in sampled_data:
-                angles.append(entry['right_hand_angle'])  # 右手のデータ
-                labels.append(f"{hand_shape_label}_right")  # 右手ラベル
+                # 右手の情報を取得
+                right_hand_info = entry['right_hand_info']
+                right_hand_angle = right_hand_info[:-1]  # 最後の要素を除いたものが角度
+                right_hand_orientation = right_hand_info[-1]  # 最後の要素が手のひらの向き
+                angles.append(right_hand_angle)  # 右手のデータ
+                labels.append(f"{hand_shape_label}_right_{right_hand_orientation}")  # 右手ラベル
                 subjects.append(subject_id)
 
-                angles.append(entry['left_hand_angle'])  # 左手のデータ
-                labels.append(f"{hand_shape_label}_left")  # 左手ラベル
+                # 左手の情報を取得
+                left_hand_info = entry['left_hand_info']
+                left_hand_angle = left_hand_info[:-1]  # 最後の要素を除いたものが角度
+                left_hand_orientation = left_hand_info[-1]  # 最後の要素が手のひらの向き
+                angles.append(left_hand_angle)  # 左手のデータ
+                labels.append(f"{hand_shape_label}_left_{left_hand_orientation}")  # 左手ラベル
                 subjects.append(subject_id)
 
     # numpy配列に変換
@@ -117,21 +125,6 @@ def main():
         print(f"  Fold {fold}: Validation accuracy: {val_accuracy * 100:.2f}%")
         accuracies.append(val_accuracy)
 
-        # ラベル別の認識率の計算
-        for label in ['right', 'left']:
-            label_indices = [i for i, y in enumerate(Y[val_index]) if label in y]
-            label_true = np.array([Y_val_k[i] for i in label_indices])
-            label_pred = np.array([Y_val_pred[i] for i in label_indices])
-
-            label_acc = accuracy_score(np.argmax(label_true, axis=1), np.argmax(label_pred, axis=1))
-
-            # 被験者ごとの精度を記録
-            for i, subject in enumerate(np.array(subjects)[val_index][label_indices]):
-                hand_label = f"{subject}_{label}"
-                if hand_label not in label_accuracies[label]:
-                    label_accuracies[label][hand_label] = []
-                label_accuracies[label][hand_label].append(label_acc)
-
     # 結果を保存
     mean_accuracy = np.mean(accuracies)
     std_accuracy = np.std(accuracies)
@@ -141,21 +134,6 @@ def main():
     results['std_accuracy'] = std_accuracy
     results['confidence_interval'] = confidence_interval
     results['fold_accuracies'] = accuracies
-
-    # ラベル別の精度の平均と分散、信頼区間の計算
-    for label in label_accuracies:
-        for hand_label in label_accuracies[label]:
-            accuracies_for_label = label_accuracies[label][hand_label]
-            mean_label_accuracy = np.mean(accuracies_for_label)
-            std_label_accuracy = np.std(accuracies_for_label)
-            confidence_interval_label = calculate_confidence_interval(accuracies_for_label)
-            if label not in results:
-                results[label] = {}
-            results[label][hand_label] = {
-                'mean_accuracy': mean_label_accuracy,
-                'std_accuracy': std_label_accuracy,
-                'confidence_interval': confidence_interval_label
-            }
 
     # 結果をJSON形式で保存
     output_dir = './do/data/output'
