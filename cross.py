@@ -43,7 +43,7 @@ def calculate_confidence_interval(data, confidence=0.95):
 
 def main():
     # JSONファイルが保存されているディレクトリのパス
-    data_dir = r'./do/data/output/angle'
+    data_dir = r'./do/data/output/hand_info'
     
     # データの準備
     angles = []
@@ -66,18 +66,16 @@ def main():
             # 右手と左手の角度を取得
             for entry in sampled_data:
                 # 右手の情報を取得
-                right_hand_info = entry['right_hand_info']
-                right_hand_angle = right_hand_info[:-1]  # 最後の要素を除いたものが角度
-                right_hand_orientation = right_hand_info[-1]  # 最後の要素が手のひらの向き
-                angles.append(right_hand_angle)  # 右手のデータ
+                right_hand_info = entry['angles']
+                right_hand_orientation = entry['palm_orientation']
+                angles.append(right_hand_info)  # 右手のデータ
                 labels.append(f"{hand_shape_label}_right_{right_hand_orientation}")  # 右手ラベル
                 subjects.append(subject_id)
 
                 # 左手の情報を取得
-                left_hand_info = entry['left_hand_info']
-                left_hand_angle = left_hand_info[:-1]  # 最後の要素を除いたものが角度
-                left_hand_orientation = left_hand_info[-1]  # 最後の要素が手のひらの向き
-                angles.append(left_hand_angle)  # 左手のデータ
+                left_hand_info = entry['angles']
+                left_hand_orientation = entry['palm_orientation']
+                angles.append(left_hand_info)  # 左手のデータ
                 labels.append(f"{hand_shape_label}_left_{left_hand_orientation}")  # 左手ラベル
                 subjects.append(subject_id)
 
@@ -95,11 +93,22 @@ def main():
     group_kfold = GroupKFold(n_splits=5)
 
     # 結果を保存するための辞書
-    results = {'right_hand': {}, 'left_hand': {}, 'mean_accuracy': None, 'std_accuracy': None, 'confidence_interval': None, 'fold_accuracies': []}
+    results = {
+        'mean_accuracy': None,
+        'std_accuracy': None,
+        'confidence_interval': None,
+        'fold_accuracies': [],
+        'hand_shape_accuracies': {}
+    }
 
     print('Training model with combined right and left hand labels...')
     accuracies = []
-    label_accuracies = {'right': {}, 'left': {}}
+    
+    # 手形ごとの認識精度を格納する辞書
+    hand_shape_accuracies = {}
+    for i in range(1, 65):
+        hand_shape_accuracies[f"{str(i).zfill(2)}r"] = []  # 右手
+        hand_shape_accuracies[f"{str(i).zfill(2)}l"] = []  # 左手
 
     # 各foldでの処理
     for fold, (train_index, val_index) in enumerate(group_kfold.split(X, Y_one_hot, groups), 1):
@@ -125,6 +134,15 @@ def main():
         print(f"  Fold {fold}: Validation accuracy: {val_accuracy * 100:.2f}%")
         accuracies.append(val_accuracy)
 
+        # 手形ごとの認識精度を格納
+        for i in range(1, 65):
+            label_r = f"{str(i).zfill(2)}r"
+            label_l = f"{str(i).zfill(2)}l"
+            # 右手
+            hand_shape_accuracies[label_r].append(np.mean(Y_val_pred[Y_val_k == label_r]))
+            # 左手
+            hand_shape_accuracies[label_l].append(np.mean(Y_val_pred[Y_val_k == label_l]))
+
     # 結果を保存
     mean_accuracy = np.mean(accuracies)
     std_accuracy = np.std(accuracies)
@@ -134,11 +152,12 @@ def main():
     results['std_accuracy'] = std_accuracy
     results['confidence_interval'] = confidence_interval
     results['fold_accuracies'] = accuracies
+    results['hand_shape_accuracies'] = hand_shape_accuracies
 
     # 結果をJSON形式で保存
     output_dir = './do/data/output'
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "combined_hand_results.json")
+    output_path = os.path.join(output_dir, "results.json")
 
     with open(output_path, "w", encoding='utf-8') as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
