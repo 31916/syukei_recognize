@@ -17,15 +17,15 @@ mp_drawing = mp.solutions.drawing_utils
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 # ブレを判定するスレッショルド値
-THRESHOLD = 8  # フレーム間での許容移動距離
+THRESHOLD = 10  # フレーム間での許容移動距離
 
 def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
 
     # 出力ディレクトリのパスを設定
     save_frame_dir = os.path.join(output_dir_frame, f'{video_name}_frames')
-    save_hand_info_path_r = os.path.join(output_dir_hand_info, f'{video_name}_r.json')
-    save_hand_info_path_l = os.path.join(output_dir_hand_info, f'{video_name}_l.json')
+    save_hand_info_path_r = os.path.join(output_dir_hand_info, f'{video_name}r.json')
+    save_hand_info_path_l = os.path.join(output_dir_hand_info, f'{video_name}l.json')
     save_landmark_dir = os.path.join(output_dir_landmark, f'{video_name}_landmarks')
     save_pos_path = os.path.join(output_dir_pos, f'{video_name}.json')
 

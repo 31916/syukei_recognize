@@ -41,6 +41,31 @@ def calculate_confidence_interval(data, confidence=0.95):
     interval = stats.t.interval(confidence, len(data)-1, loc=mean, scale=stats.sem(data))
     return [interval[0], interval[1]]
 
+# データ前処理: NaNやInfを除去または置き換え
+def clean_data(array):
+    # NaNやInfを0に置き換える
+    return np.where(np.isnan(array) | np.isinf(array), 0, array)
+
+# 平均値を計算する前に、空でないことを確認
+def safe_mean(array):
+    if np.any(array):  # 配列が空でない場合
+        return np.mean(array)
+    else:
+        return 0  # 配列が空の場合は0を返す（適切な処理に変更可能）
+
+# 除算を安全に行う
+def safe_divide(numerator, denominator):
+    # ゼロ除算を防ぐために、分母がゼロでないことを確認
+    safe_denominator = np.where(denominator == 0, 1, denominator)  # ゼロの分母を1に変更
+    return numerator / safe_denominator  # 安全に除算
+
+# 例: トレーニングループ内での精度の計算
+def train_model(model, train_data, val_data):
+    # トレーニングと検証データの前処理
+    train_data = clean_data(train_data)
+    val_data = clean_data(val_data)
+
+
 def main():
     # JSONファイルが保存されているディレクトリのパス
     data_dir = r'./do/data/output/hand_info'
