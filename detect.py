@@ -17,7 +17,7 @@ mp_drawing = mp.solutions.drawing_utils
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 # ブレを判定するスレッショルド値
-THRESHOLD = 20  # フレーム間での許容移動距離
+THRESHOLD = 5  # フレーム間での許容移動距離
 
 def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
@@ -79,7 +79,8 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
             "frame": frame_count,
             "angles": degree_r,
             "palm_orientation": hand_orientation_r["palm_orientation"],
-            "yaw": hand_orientation_r["yaw"]
+            "yaw": hand_orientation_r["yaw"],
+            "rl": 1
         })
 
         # 左手の情報
@@ -87,7 +88,8 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
             "frame": frame_count,
             "angles": degree_l,
             "palm_orientation": hand_orientation_l["palm_orientation"],
-            "yaw": hand_orientation_l["yaw"]
+            "yaw": hand_orientation_l["yaw"],
+            "rl" : 0
         })
 
         pos_info = {

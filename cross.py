@@ -77,6 +77,7 @@ def safe_divide(numerator, denominator):
     safe_denominator = np.where(denominator == 0, 1, denominator)  # ゼロの分母を1に変更
     return numerator / safe_denominator
 
+# データ準備処理部分を改良
 # メイン処理
 def main():
     # JSONファイルが保存されているディレクトリのパス
@@ -90,40 +91,51 @@ def main():
     # ディレクトリ内のすべてのJSONファイルを処理
     for file_name in os.listdir(data_dir):
         if file_name.endswith('.json'):
+            # ファイル名からラベル（形状）と被験者IDを取得
             hand_shape_label = file_name.split('_')[1].split('.')[0]
             subject_id = file_name.split('_')[0]
             
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            if not data or any('angles' not in entry or 'palm_orientation' not in entry for entry in data):
+            # データが空、または不正データの場合はスキップ
+            if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'hand' not in entry for entry in data):
                 print(f"Invalid or empty data in file: {file_name}")
                 continue
 
-            sampled_data = np.random.choice(data, 5, replace=False) if len(data) >= 5 else data
+            # 右手と左手を分けて処理
+            right_hand_data = [entry for entry in data if entry.get('hand') == 1]
+            left_hand_data = [entry for entry in data if entry.get('hand') == 0]
 
-            for entry in sampled_data:
-                right_hand_info = entry.get('angles')
-                right_hand_orientation = entry.get('palm_orientation')
+            # 右手データのサンプリングと追加
+            if right_hand_data:
+                sampled_right_hand_data = np.random.choice(right_hand_data, 5, replace=False) if len(right_hand_data) >= 5 else right_hand_data
+                for entry in sampled_right_hand_data:
+                    right_hand_info = entry.get('angles')
+                    right_hand_orientation = entry.get('palm_orientation')
 
-                if right_hand_info is None or np.any(np.isnan(right_hand_info)):
-                    print(f"Invalid angles in file: {file_name}")
-                    continue
+                    if right_hand_info is None or np.any(np.isnan(right_hand_info)):
+                        print(f"Invalid angles in file: {file_name} (Right Hand)")
+                        continue
 
-                angles.append(right_hand_info)
-                labels.append(f"{hand_shape_label}_right_{right_hand_orientation}")
-                subjects.append(subject_id)
+                    angles.append(right_hand_info)
+                    labels.append(f"{hand_shape_label}_right_{right_hand_orientation}")
+                    subjects.append(subject_id)
 
-                left_hand_info = entry.get('angles')
-                left_hand_orientation = entry.get('palm_orientation')
+            # 左手データのサンプリングと追加
+            if left_hand_data:
+                sampled_left_hand_data = np.random.choice(left_hand_data, 5, replace=False) if len(left_hand_data) >= 5 else left_hand_data
+                for entry in sampled_left_hand_data:
+                    left_hand_info = entry.get('angles')
+                    left_hand_orientation = entry.get('palm_orientation')
 
-                if left_hand_info is None or np.any(np.isnan(left_hand_info)):
-                    print(f"Invalid angles in file: {file_name}")
-                    continue
+                    if left_hand_info is None or np.any(np.isnan(left_hand_info)):
+                        print(f"Invalid angles in file: {file_name} (Left Hand)")
+                        continue
 
-                angles.append(left_hand_info)
-                labels.append(f"{hand_shape_label}_left_{left_hand_orientation}")
-                subjects.append(subject_id)
+                    angles.append(left_hand_info)
+                    labels.append(f"{hand_shape_label}_left_{left_hand_orientation}")
+                    subjects.append(subject_id)
 
     # デバッグ: データ型の確認
     print(f"Type of Y: {type(labels)}, Example: {labels[:5]}")
@@ -141,9 +153,8 @@ def main():
     Y_encoded = label_encoder.fit_transform(Y)
     Y_one_hot = to_categorical(Y_encoded)
 
+    # K-Fold交差検証
     group_kfold = GroupKFold(n_splits=5)
-    # 以下は元のコードの処理に続く...
-
 
     results = {
         'mean_accuracy': None,
@@ -191,6 +202,10 @@ def main():
 
     with open(output_path, "w", encoding='utf-8') as f:
         json.dump(results, f, indent=4, ensure_ascii=False, default=convert_to_serializable)
+
+if __name__ == '__main__':
+    main()
+
 
 if __name__ == '__main__':
     main()
