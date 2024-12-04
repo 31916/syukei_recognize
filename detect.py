@@ -19,7 +19,7 @@ drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 # ブレを判定するスレッショルド値
 THRESHOLD = 5  # フレーム間での許容移動距離
 
-def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos):
+def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos, THRESHOLD=10.0):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
 
     # 出力ディレクトリのパスを設定
@@ -57,62 +57,73 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
         height, width, _ = frame.shape
         pos_r, pos_l, landmark_bgr = landmark(frame, height, width)
 
+        # 両手がNaNの場合はフレームをスキップ
+        if np.all(np.isnan(pos_r)) and np.all(np.isnan(pos_l)):
+            print(f'Skipping frame {frame_count} due to both hands being NaN.')
+            frame_count += 1
+            continue  # このフレームの処理をスキップ
+
+        # 片方の手がNaNの場合、その手のデータを記録しない
+        degree_r, degree_l, rad_r, rad_l, hand_orientation_r, hand_orientation_l = angle(pos_r, pos_l)
+
+        if not np.all(np.isnan(pos_r)):  # 右手が有効な場合
+            if not np.any(np.isnan(degree_r)):
+                hand_info_r.append({
+                    "frame": frame_count,
+                    "angles": degree_r,
+                    "palm_orientation": hand_orientation_r["palm_orientation"],
+                    "yaw": hand_orientation_r["yaw"],
+                    "rl": 1
+                })
+        if not np.all(np.isnan(pos_l)):  # 左手が有効な場合
+            if not np.any(np.isnan(degree_l)):
+                hand_info_l.append({
+                    "frame": frame_count,
+                    "angles": degree_l,
+                    "palm_orientation": hand_orientation_l["palm_orientation"],
+                    "yaw": hand_orientation_l["yaw"],
+                    "rl": 0
+                })
+
         # 前フレームと比較してブレをチェック
         if prev_pos_r is not None and prev_pos_l is not None:
-            diff_r = np.nanmax(np.linalg.norm(pos_r - prev_pos_r, axis=1))
-            diff_l = np.nanmax(np.linalg.norm(pos_l - prev_pos_l, axis=1))
+            diff_r = np.nanmax(np.linalg.norm(pos_r - prev_pos_r, axis=1))  # 右手の位置差
+            diff_l = np.nanmax(np.linalg.norm(pos_l - prev_pos_l, axis=1))  # 左手の位置差
             if diff_r > THRESHOLD or diff_l > THRESHOLD:
                 print(f'Skipping frame {frame_count} due to excessive movement.')
                 frame_count += 1
                 prev_pos_r, prev_pos_l = pos_r, pos_l  # 次のフレームのために現在の座標を保存
                 continue  # このフレームの処理をスキップ
 
-        degree_r, degree_l, rad_r, rad_l, hand_orientation_r, hand_orientation_l = angle(pos_r, pos_l)
-
-        if np.any(np.isnan(pos_r)) or np.any(np.isnan(pos_l)) or np.any(np.isnan(degree_r)) or np.any(np.isnan(degree_l)):
-            print(f'Skipping frame {frame_count} due to NaN values.')
-            frame_count += 1
-            continue
-
-        # 右手の情報
-        hand_info_r.append({
-            "frame": frame_count,
-            "angles": degree_r,
-            "palm_orientation": hand_orientation_r["palm_orientation"],
-            "yaw": hand_orientation_r["yaw"],
-            "rl": 1
-        })
-
-        # 左手の情報
-        hand_info_l.append({
-            "frame": frame_count,
-            "angles": degree_l,
-            "palm_orientation": hand_orientation_l["palm_orientation"],
-            "yaw": hand_orientation_l["yaw"],
-            "rl" : 0
-        })
-
+        # 座標情報はどちらか片方でも有効であれば記録
         pos_info = {
             "frame": frame_count,
-            "right_hand_pos": pos_r.tolist(),
-            "left_hand_pos": pos_l.tolist()
+            "right_hand_pos": pos_r.tolist() if not np.all(np.isnan(pos_r)) else None,
+            "left_hand_pos": pos_l.tolist() if not np.all(np.isnan(pos_l)) else None
         }
         pos_data.append(pos_info)
 
+        # フレームを保存
         frame_filename = os.path.join(save_frame_dir, f"{video_name}_{frame_count:04d}.jpg")
         cv2.imwrite(frame_filename, frame)
 
+        # ランドマークを保存
         landmark_filename = os.path.join(save_landmark_dir, f"{video_name}_{frame_count:04d}.jpg")
         cv2.imwrite(landmark_filename, landmark_bgr.astype(np.uint8))
 
         frame_count += 1
+
+        # ここで、前の座標を更新する
         prev_pos_r, prev_pos_l = pos_r, pos_l  # 現在の座標を保存して次のフレームへ
 
-    with open(save_hand_info_path_r, 'w') as json_file:
-        json.dump(hand_info_r, json_file, indent=4)
+    # 結果を保存
+    if hand_info_r:
+        with open(save_hand_info_path_r, 'w') as json_file:
+            json.dump(hand_info_r, json_file, indent=4)
 
-    with open(save_hand_info_path_l, 'w') as json_file:
-        json.dump(hand_info_l, json_file, indent=4)
+    if hand_info_l:
+        with open(save_hand_info_path_l, 'w') as json_file:
+            json.dump(hand_info_l, json_file, indent=4)
 
     with open(save_pos_path, 'w') as json_file:
         json.dump(pos_data, json_file, indent=4)
