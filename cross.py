@@ -16,8 +16,6 @@ def create_model(input_shape, num_classes):
     model.add(Dense(64, activation='relu'))
     model.add(Dense(64, activation='relu'))
     model.add(Dense(64, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dense(64, activation='relu'))
     model.add(Dropout(0.5))
     model.add(Dense(num_classes, activation='softmax'))
     return model
@@ -32,6 +30,18 @@ def check_invalid_values(data, name="Data"):
             print(f"Info: {name} is not a numeric array, skipping NaN/Inf check.")
     except AttributeError:
         print(f"Error: {name} is not a NumPy array. Skipping validation.")
+
+def convert_to_serializable(obj):
+    if isinstance(obj, (np.ndarray, list)):  # NumPy配列やリストをリストに変換
+        return obj.tolist()
+    elif isinstance(obj, (np.float32, np.float64)):  # NumPyの浮動小数点数をPythonのfloatに変換
+        return float(obj)
+    elif isinstance(obj, (np.int32, np.int64)):  # NumPyの整数をPythonのintに変換
+        return int(obj)
+    elif obj is None:  # Noneをそのまま返す
+        return None
+    raise TypeError(f"Type {type(obj)} not serializable")  # 未対応の型の場合はエラー
+
 
 
 # 信頼区間の計算（無効な値の場合はスキップ）
@@ -90,7 +100,7 @@ def main():
                 print(f"Invalid or empty data in file: {file_name}")
                 continue
 
-            sampled_data = np.random.choice(data, 20, replace=False) if len(data) >= 20 else data
+            sampled_data = np.random.choice(data, 5, replace=False) if len(data) >= 5 else data
 
             for entry in sampled_data:
                 right_hand_info = entry.get('angles')
