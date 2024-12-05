@@ -42,7 +42,6 @@ def prepare_data(data_dir):
                 sampled_right_hand_data = np.random.choice(right_hand_data, 5, replace=False) if len(right_hand_data) >= 5 else right_hand_data
                 for entry in sampled_right_hand_data:
                     right_hand_info = entry.get('angles')
-                    right_hand_orientation = entry.get('palm_orientation')
 
                     if right_hand_info is None or np.any(np.isnan(right_hand_info)):
                         continue
@@ -55,7 +54,6 @@ def prepare_data(data_dir):
                 sampled_left_hand_data = np.random.choice(left_hand_data, 5, replace=False) if len(left_hand_data) >= 5 else left_hand_data
                 for entry in sampled_left_hand_data:
                     left_hand_info = entry.get('angles')
-                    left_hand_orientation = entry.get('palm_orientation')
 
                     if left_hand_info is None or np.any(np.isnan(left_hand_info)):
                         continue
