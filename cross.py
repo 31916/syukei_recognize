@@ -99,13 +99,13 @@ def main():
                 data = json.load(f)
 
             # データが空、または不正データの場合はスキップ
-            if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'hand' not in entry for entry in data):
+            if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'rl' not in entry for entry in data):
                 print(f"Invalid or empty data in file: {file_name}")
                 continue
 
             # 右手と左手を分けて処理
-            right_hand_data = [entry for entry in data if entry.get('hand') == 1]
-            left_hand_data = [entry for entry in data if entry.get('hand') == 0]
+            right_hand_data = [entry for entry in data if entry.get('rl') == 1]
+            left_hand_data = [entry for entry in data if entry.get('rl') == 0]
 
             # 右手データのサンプリングと追加
             if right_hand_data:
