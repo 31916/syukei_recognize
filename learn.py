@@ -6,6 +6,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.utils import to_categorical
 
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 # モデルの構築
 def create_model(input_shape, num_classes):
     model = Sequential()
@@ -78,13 +80,19 @@ def train_model(X, Y, output_dir):
     model.fit(clean_data(X), clean_data(Y_one_hot), epochs=100, batch_size=16, verbose=1)
 
     os.makedirs(output_dir, exist_ok=True)
-    model.save(os.path.join(output_dir, 'trained_model.h5'))
+    model.save(os.path.join(output_dir, 'trained_model.keras'))
     with open(os.path.join(output_dir, 'label_encoder.json'), 'w', encoding='utf-8') as f:
         json.dump(label_encoder.classes_.tolist(), f, ensure_ascii=False, indent=4)
 
 if __name__ == '__main__':
-    data_dir = r'./do/data/output/hand_info'
-    output_dir = r'./do/data/output'
+    
+    # #für mirura labo PC
+    # data_dir = r'./do/data/output/hand_info'
+    # output_dir = r'./do/data/output'
+    
+    #für mein weiss PC
+    data_dir = r"C:\Users\harut\do\data\output\hand_info"
+    output_dir = r"C:\Users\harut\do\data\output"
 
     X, Y, groups = prepare_data(data_dir)
     train_model(X, Y, output_dir)
