@@ -1,81 +1,93 @@
-import os
 import json
 import numpy as np
-from sklearn.model_selection import GroupKFold
-from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from tensorflow.keras.models import load_model
-from tensorflow.keras.utils import to_categorical
-from scipy import stats
-import learn as l
 
-def convert_to_serializable(obj):
-    if isinstance(obj, (np.ndarray, list)):  # NumPy配列やリストをリストに変換
-        return obj.tolist()
-    elif isinstance(obj, (np.float32, np.float64)):  # NumPyの浮動小数点数をPythonのfloatに変換
-        return float(obj)
-    elif isinstance(obj, (np.int32, np.int64)):  # NumPyの整数をPythonのintに変換
-        return int(obj)
-    elif obj is None:  # Noneをそのまま返す
-        return None
-    raise TypeError(f"Type {type(obj)} not serializable")  # 未対応の型の場合はエラー
-
-# データ前処理: NaNやInfを除去または置き換え
-def clean_data(array):
-    return np.where(np.isnan(array) | np.isinf(array), 0, array)
-
-# 信頼区間の計算
-def calculate_confidence_interval(data, confidence=0.95):
-    if len(data) < 2 or np.any(np.isnan(data)) or np.any(np.isinf(data)):
-        return [None, None]
-    std_dev = np.std(data)
-    if std_dev == 0:
-        return [None, None]
-
-    mean = np.mean(data)
-    interval = stats.t.interval(confidence, len(data)-1, loc=mean, scale=stats.sem(data))
-    return [interval[0], interval[1]]
-
-def evaluate_model(X, Y, groups, model_path, label_encoder_path):
-    with open(label_encoder_path, 'r', encoding='utf-8') as f:
-        classes = json.load(f)
-
-    group_kfold = GroupKFold(n_splits=5)
+def evaluate_model_with_visualization(X, y, subjects, model_path, label_encoder_path, output_path="./output"):
+    # Load model and label encoder
     model = load_model(model_path)
+    with open(label_encoder_path, "r") as f:
+        label_encoder = json.load(f)
+    
+    # Ensure X and y are numpy arrays
+    X = np.array(X)
+    y = np.array(y)
 
-    Y_encoded = np.array([classes.index(label) for label in Y])
-    Y_one_hot = to_categorical(Y_encoded, num_classes=len(classes))
+    # Generate predictions
+    predictions = model.predict(X)
+    predicted_labels = np.argmax(predictions, axis=1)
+    true_labels = np.argmax(y, axis=1)
+    
+    # Decode labels
+    true_label_names = [label_encoder[label] for label in true_labels]
+    predicted_label_names = [label_encoder[label] for label in predicted_labels]
 
-    accuracies = []
-    for train_index, val_index in group_kfold.split(X, Y_one_hot, groups):
-        X_train_k, X_val_k = clean_data(X[train_index]), clean_data(X[val_index])
-        Y_train_k, Y_val_k = clean_data(Y_one_hot[train_index]), clean_data(Y_one_hot[val_index])
+    # Calculate classification report
+    class_report = classification_report(true_label_names, predicted_label_names, output_dict=True)
 
-        Y_val_pred = model.predict(X_val_k, verbose=0)
-        val_accuracy = accuracy_score(np.argmax(Y_val_k, axis=1), np.argmax(Y_val_pred, axis=1))
-        accuracies.append(val_accuracy)
+    # Create confusion matrix
+    cm = confusion_matrix(true_label_names, predicted_label_names, labels=label_encoder)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_encoder)
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix")
+    plt.savefig(f"{output_path}/confusion_matrix.png")
+    plt.close()
 
-    mean_accuracy = np.mean(accuracies)
-    std_accuracy = np.std(accuracies)
-    confidence_interval = calculate_confidence_interval(accuracies)
-
-    results = {
-        'mean_accuracy': mean_accuracy,
-        'std_accuracy': std_accuracy,
-        'confidence_interval': confidence_interval,
-        'fold_accuracies': accuracies
+    # Save label-wise accuracy
+    label_accuracy = {
+        label: {
+            "correct": cm[i, i],
+            "total": sum(cm[i]),
+            "accuracy": cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0
+        }
+        for i, label in enumerate(label_encoder)
     }
+    
+    # Visualize label-wise accuracy
+    accuracies = [value["accuracy"] for value in label_accuracy.values()]
+    plt.bar(label_encoder, accuracies)
+    plt.xticks(rotation=90)
+    plt.title("Label-wise Accuracy")
+    plt.ylabel("Accuracy")
+    plt.xlabel("Labels")
+    plt.tight_layout()
+    plt.savefig(f"{output_path}/label_accuracy.png")
+    plt.close()
 
-    output_dir = './do/data/output'
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, "results.json")
+    # Save TOP3 predictions
+    top3_predictions = []
+    for i, probs in enumerate(predictions):
+        top3_indices = np.argsort(probs)[::-1][:3]
+        top3_labels = [label_encoder[idx] for idx in top3_indices]
+        top3_probs = [probs[idx] for idx in top3_indices]
+        top3_predictions.append({
+            "true_label": true_label_names[i],
+            "top3_predictions": [
+                {"label": label, "probability": float(prob)}
+                for label, prob in zip(top3_labels, top3_probs)
+            ]
+        })
+    
+    # Save results to JSON
+    results = {
+        "mean_accuracy": np.mean(accuracies),
+        "std_accuracy": np.std(accuracies),
+        "label_accuracy": label_accuracy,
+        "top3_predictions": top3_predictions
+    }
+    with open(f"{output_path}/results.json", "w") as f:
+        json.dump(results, f, indent=4)
+    
+    print(f"Evaluation completed. Results saved to {output_path}/results.json")
 
-    with open(output_path, "w", encoding='utf-8') as f:
-        json.dump(results, f, indent=4, ensure_ascii=False, default=convert_to_serializable)
-
-if __name__ == '__main__':
-    data_dir = r'./do/data/output/hand_info'
-    model_path = r'./do/data/output/trained_model.h5'
-    label_encoder_path = r'./do/data/output/label_encoder.json'
-
-    angles, labels, subjects = l.prepare_data(data_dir)
-    evaluate_model(np.array(angles), np.array(labels), np.array(subjects), model_path, label_encoder_path)
+# Example usage
+evaluate_model_with_visualization(
+    X=angles,
+    y=labels,
+    subjects=subjects,
+    model_path="./model/model.h5",
+    label_encoder_path="./model/label_encoder.json",
+    output_path="./output"
+)
