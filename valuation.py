@@ -1,93 +1,102 @@
+import os
 import json
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
-from tensorflow.keras.models import load_model
+from sklearn.preprocessing import LabelEncoder
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Input, Dropout
+from tensorflow.keras.utils import to_categorical
 
-def evaluate_model_with_visualization(X, y, subjects, model_path, label_encoder_path, output_path="./output"):
-    # Load model and label encoder
-    model = load_model(model_path)
-    with open(label_encoder_path, "r") as f:
-        label_encoder = json.load(f)
-    
-    # Ensure X and y are numpy arrays
-    X = np.array(X)
-    y = np.array(y)
+# モデルの構築
+def create_model(input_shape, num_classes):
+    model = Sequential()
+    model.add(Input(shape=input_shape))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dense(64, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(num_classes, activation='softmax'))
+    return model
 
-    # Generate predictions
-    predictions = model.predict(X)
-    predicted_labels = np.argmax(predictions, axis=1)
-    true_labels = np.argmax(y, axis=1)
-    
-    # Decode labels
-    true_label_names = [label_encoder[label] for label in true_labels]
-    predicted_label_names = [label_encoder[label] for label in predicted_labels]
+# データ前処理: NaNやInfを除去または置き換え
+def clean_data(array):
+    return np.where(np.isnan(array) | np.isinf(array), 0, array)
 
-    # Calculate classification report
-    class_report = classification_report(true_label_names, predicted_label_names, output_dict=True)
+def prepare_data(data_dir):
+    angles, labels, subjects = [], [], []
 
-    # Create confusion matrix
-    cm = confusion_matrix(true_label_names, predicted_label_names, labels=label_encoder)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=label_encoder)
-    disp.plot(cmap=plt.cm.Blues)
-    plt.title("Confusion Matrix")
-    plt.savefig(f"{output_path}/confusion_matrix.png")
-    plt.close()
+    for file_name in os.listdir(data_dir):
+        if file_name.endswith('.json'):
+            hand_shape_label = file_name.split('_')[1].split('.')[0]
+            subject_id = file_name.split('_')[0]
+            
+            with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
+                data = json.load(f)
 
-    # Save label-wise accuracy
-    label_accuracy = {
-        label: {
-            "correct": cm[i, i],
-            "total": sum(cm[i]),
-            "accuracy": cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0
-        }
-        for i, label in enumerate(label_encoder)
-    }
-    
-    # Visualize label-wise accuracy
-    accuracies = [value["accuracy"] for value in label_accuracy.values()]
-    plt.bar(label_encoder, accuracies)
-    plt.xticks(rotation=90)
-    plt.title("Label-wise Accuracy")
-    plt.ylabel("Accuracy")
-    plt.xlabel("Labels")
-    plt.tight_layout()
-    plt.savefig(f"{output_path}/label_accuracy.png")
-    plt.close()
+            # データが正しく含まれているか確認
+            if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'rl' not in entry for entry in data):
+                continue
 
-    # Save TOP3 predictions
-    top3_predictions = []
-    for i, probs in enumerate(predictions):
-        top3_indices = np.argsort(probs)[::-1][:3]
-        top3_labels = [label_encoder[idx] for idx in top3_indices]
-        top3_probs = [probs[idx] for idx in top3_indices]
-        top3_predictions.append({
-            "true_label": true_label_names[i],
-            "top3_predictions": [
-                {"label": label, "probability": float(prob)}
-                for label, prob in zip(top3_labels, top3_probs)
-            ]
-        })
-    
-    # Save results to JSON
-    results = {
-        "mean_accuracy": np.mean(accuracies),
-        "std_accuracy": np.std(accuracies),
-        "label_accuracy": label_accuracy,
-        "top3_predictions": top3_predictions
-    }
-    with open(f"{output_path}/results.json", "w") as f:
-        json.dump(results, f, indent=4)
-    
-    print(f"Evaluation completed. Results saved to {output_path}/results.json")
+            right_hand_data = [entry for entry in data if entry.get('rl') == 1]
+            left_hand_data = [entry for entry in data if entry.get('rl') == 0]
 
-# Example usage
-evaluate_model_with_visualization(
-    X=angles,
-    y=labels,
-    subjects=subjects,
-    model_path="./model/model.h5",
-    label_encoder_path="./model/label_encoder.json",
-    output_path="./output"
-)
+            if right_hand_data:
+                sampled_right_hand_data = np.random.choice(right_hand_data, 5, replace=False) if len(right_hand_data) >= 5 else right_hand_data
+                for entry in sampled_right_hand_data:
+                    right_hand_info = entry.get('angles')
+
+                    if right_hand_info is None or np.any(np.isnan(right_hand_info)):
+                        continue
+
+                    angles.append(right_hand_info)
+                    labels.append(f"{hand_shape_label}_right")
+                    subjects.append(subject_id)
+
+            if left_hand_data:
+                sampled_left_hand_data = np.random.choice(left_hand_data, 5, replace=False) if len(left_hand_data) >= 5 else left_hand_data
+                for entry in sampled_left_hand_data:
+                    left_hand_info = entry.get('angles')
+
+                    if left_hand_info is None or np.any(np.isnan(left_hand_info)):
+                        continue
+
+                    angles.append(left_hand_info)
+                    labels.append(f"{hand_shape_label}_left")
+                    subjects.append(subject_id)
+
+    # データをNumPyの配列に変換
+    X = np.array(angles)
+    Y = np.array(labels)
+    groups = np.array(subjects)
+
+    # Xの形状を確認し、必要に応じて整形
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)  # 角度データが1次元の場合、2次元に変換する
+
+    return X, Y, groups
+
+def train_model(X, Y, output_dir):
+    label_encoder = LabelEncoder()
+    Y_encoded = label_encoder.fit_transform(Y)
+    Y_one_hot = to_categorical(Y_encoded)
+
+    # モデルの作成
+    model = create_model(input_shape=(X.shape[1],), num_classes=Y_one_hot.shape[1])
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # 学習の実行
+    model.fit(clean_data(X), clean_data(Y_one_hot), epochs=100, batch_size=16, verbose=1)
+
+    # モデルとラベルエンコーダーの保存
+    os.makedirs(output_dir, exist_ok=True)
+    model.save(os.path.join(output_dir, 'trained_model.h5'))
+    with open(os.path.join(output_dir, 'label_encoder.json'), 'w', encoding='utf-8') as f:
+        json.dump(label_encoder.classes_.tolist(), f, ensure_ascii=False, indent=4)
+
+if __name__ == '__main__':
+    data_dir = r'./do/data/output/hand_info'
+    output_dir = r'./do/data/output'
+
+    # データの準備
+    X, Y, groups = prepare_data(data_dir)
+    # モデルの学習
+    train_model(X, Y, output_dir)

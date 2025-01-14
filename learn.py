@@ -86,13 +86,13 @@ def train_model(X, Y, output_dir):
 
 if __name__ == '__main__':
     
-    # #für mirura labo PC
-    # data_dir = r'./do/data/output/hand_info'
-    # output_dir = r'./do/data/output'
+    #für mirura labo PC
+    data_dir = r'./do/data/output/hand_info'
+    output_dir = r'./do/data/output'
     
-    #für mein weiss PC
-    data_dir = r"C:\Users\harut\do\data\output\hand_info"
-    output_dir = r"C:\Users\harut\do\data\output"
+    # #für mein weiss PC
+    # data_dir = r"C:\Users\harut\do\data\output\hand_info"
+    # output_dir = r"C:\Users\harut\do\data\output"
 
     X, Y, groups = prepare_data(data_dir)
     train_model(X, Y, output_dir)
