@@ -6,8 +6,6 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input, Dropout
 from tensorflow.keras.utils import to_categorical
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
 # モデルの構築
 def create_model(input_shape, num_classes):
     model = Sequential()
@@ -34,6 +32,7 @@ def prepare_data(data_dir):
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
+            # データが正しく含まれているか確認
             if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'rl' not in entry for entry in data):
                 continue
 
@@ -64,9 +63,14 @@ def prepare_data(data_dir):
                     labels.append(f"{hand_shape_label}_left")
                     subjects.append(subject_id)
 
+    # データをNumPyの配列に変換
     X = np.array(angles)
     Y = np.array(labels)
     groups = np.array(subjects)
+
+    # Xの形状を確認し、必要に応じて整形
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)  # 角度データが1次元の場合、2次元に変換する
 
     return X, Y, groups
 
@@ -75,24 +79,24 @@ def train_model(X, Y, output_dir):
     Y_encoded = label_encoder.fit_transform(Y)
     Y_one_hot = to_categorical(Y_encoded)
 
+    # モデルの作成
     model = create_model(input_shape=(X.shape[1],), num_classes=Y_one_hot.shape[1])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    # 学習の実行
     model.fit(clean_data(X), clean_data(Y_one_hot), epochs=100, batch_size=16, verbose=1)
 
+    # モデルとラベルエンコーダーの保存
     os.makedirs(output_dir, exist_ok=True)
-    model.save(os.path.join(output_dir, 'trained_model.keras'))
+    model.save(os.path.join(output_dir, 'trained_model.h5'))
     with open(os.path.join(output_dir, 'label_encoder.json'), 'w', encoding='utf-8') as f:
         json.dump(label_encoder.classes_.tolist(), f, ensure_ascii=False, indent=4)
 
 if __name__ == '__main__':
-    
-    #für mirura labo PC
     data_dir = r'./do/data/output/hand_info'
     output_dir = r'./do/data/output'
-    
-    # #für mein weiss PC
-    # data_dir = r"C:\Users\harut\do\data\output\hand_info"
-    # output_dir = r"C:\Users\harut\do\data\output"
 
+    # データの準備
     X, Y, groups = prepare_data(data_dir)
+    # モデルの学習
     train_model(X, Y, output_dir)
