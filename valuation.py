@@ -21,7 +21,7 @@ label_encoder = LabelEncoder()
 labels_encoded = label_encoder.fit_transform(labels)
 labels_one_hot = to_categorical(labels_encoded)
 
-with open("./do/data/output/label_encoder.json", "w") as f:
+with open("./do/data/output/model/label_encoder.json", "w") as f:
     json.dump(label_encoder.classes_.tolist(), f, indent=4)
 
 #評価可視化する関数
@@ -123,7 +123,7 @@ evaluate_model_with_visualization(
     X=angles,
     y=labels_one_hot,
     subjects=subjects,
-    model_path="./do/data/output/trained_model.h5",
-    label_encoder_path="./do/data/output/label_encoder.json",
+    model_path="./do/data/output/model/trained_model.h5",
+    label_encoder_path="./do/data/output/model/label_encoder.json",
     output_path="./do/data/output/valuation"
 )

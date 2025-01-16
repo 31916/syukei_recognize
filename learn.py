@@ -20,7 +20,6 @@ def create_model(input_shape, num_classes):
 # データ前処理: NaNやInfを除去または置き換え
 def clean_data(array):
     return np.where(np.isnan(array) | np.isinf(array), 0, array)
-
 def prepare_data(data_dir):
     angles, labels, subjects = [], [], []
 
@@ -48,7 +47,7 @@ def prepare_data(data_dir):
                         continue
 
                     angles.append(right_hand_info)
-                    labels.append(f"{hand_shape_label}_right")
+                    labels.append(f"{hand_shape_label}r")  # "_right" を削除
                     subjects.append(subject_id)
 
             if left_hand_data:
@@ -60,7 +59,7 @@ def prepare_data(data_dir):
                         continue
 
                     angles.append(left_hand_info)
-                    labels.append(f"{hand_shape_label}_left")
+                    labels.append(f"{hand_shape_label}l")  # "_left" を削除
                     subjects.append(subject_id)
 
     # データをNumPyの配列に変換
@@ -76,6 +75,7 @@ def prepare_data(data_dir):
 
 def train_model(X, Y, output_dir):
     label_encoder = LabelEncoder()
+    # 修正: 簡潔なラベルに基づいてエンコード
     Y_encoded = label_encoder.fit_transform(Y)
     Y_one_hot = to_categorical(Y_encoded)
 
@@ -92,9 +92,10 @@ def train_model(X, Y, output_dir):
     with open(os.path.join(output_dir, 'label_encoder.json'), 'w', encoding='utf-8') as f:
         json.dump(label_encoder.classes_.tolist(), f, ensure_ascii=False, indent=4)
 
+
 if __name__ == '__main__':
     data_dir = r'./do/data/output/hand_info'
-    output_dir = r'./do/data/output'
+    output_dir = r'./do/data/output/model'
 
     # データの準備
     X, Y, groups = prepare_data(data_dir)
