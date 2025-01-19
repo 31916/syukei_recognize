@@ -47,7 +47,7 @@ def prepare_data(data_dir):
                         continue
 
                     angles.append(right_hand_info)
-                    labels.append(f"{hand_shape_label}")  # "_right" を削除
+                    labels.append(f"{hand_shape_label}")  
                     subjects.append(subject_id)
 
             if left_hand_data:
@@ -59,7 +59,7 @@ def prepare_data(data_dir):
                         continue
 
                     angles.append(left_hand_info)
-                    labels.append(f"{hand_shape_label}")  # "_left" を削除
+                    labels.append(f"{hand_shape_label}")  
                     subjects.append(subject_id)
 
     # データをNumPyの配列に変換

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from tensorflow.keras.models import load_model
-from evaluate import evaluate_model_with_visualization
+from valuation import evaluate_model_with_visualization
 from learn import clean_data
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical

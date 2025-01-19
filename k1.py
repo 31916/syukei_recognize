@@ -47,14 +47,14 @@ for fold, (train_index, test_index) in enumerate(kf.split(X, Y, groups=groups)):
     # モデル保存
     fold_model_path = os.path.join(output_dir, f'model_fold_{fold + 1}.h5')
     model.save(fold_model_path)
-    fold_model_paths.append((fold_model_path, test_index))
 
-print("5分割交差検証が完了しました。")
+    # 修正: NumPy 配列をリスト形式に変換して保存
+    fold_model_paths.append((fold_model_path, test_index.tolist()))
 
-# 修正：NumPy配列をリストに変換してから保存
-fold_model_paths.append((fold_model_path, test_index.tolist()))
+print("被験者ごとの5分割交差検証が完了しました。")
 
 # モデルパスとテストデータインデックスを保存
 with open(os.path.join(output_dir, 'fold_info.json'), 'w', encoding='utf-8') as f:
     json.dump(fold_model_paths, f, ensure_ascii=False, indent=4)
+
 
