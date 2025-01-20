@@ -20,18 +20,28 @@ def create_model(input_shape, num_classes):
 # データ前処理: NaNやInfを除去または置き換え
 def clean_data(array):
     return np.where(np.isnan(array) | np.isinf(array), 0, array)
+
 def prepare_data(data_dir):
     angles, labels, subjects = [], [], []
+
+    excluded_labels = {"09", "17", "18", "28"}  # Set of label prefixes to exclude
 
     for file_name in os.listdir(data_dir):
         if file_name.endswith('.json'):
             hand_shape_label = file_name.split('_')[1].split('.')[0]
             subject_id = file_name.split('_')[0]
-            
+
+            # Extract the label prefix (first two digits) to check if it should be excluded
+            label_prefix = hand_shape_label[:2]
+
+            # Skip labels that match the excluded prefixes
+            if label_prefix in excluded_labels:
+                continue
+
             with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # データが正しく含まれているか確認
+            # Data integrity check
             if not data or any('angles' not in entry or 'palm_orientation' not in entry or 'rl' not in entry for entry in data):
                 continue
 
@@ -62,16 +72,17 @@ def prepare_data(data_dir):
                     labels.append(f"{hand_shape_label}")  
                     subjects.append(subject_id)
 
-    # データをNumPyの配列に変換
+    # Data conversion
     X = np.array(angles)
     Y = np.array(labels)
     groups = np.array(subjects)
 
-    # Xの形状を確認し、必要に応じて整形
+    # Reshape if needed
     if X.ndim == 1:
-        X = X.reshape(-1, 1)  # 角度データが1次元の場合、2次元に変換する
+        X = X.reshape(-1, 1)
 
     return X, Y, groups
+
 
 def train_model(X, Y, output_dir):
     label_encoder = LabelEncoder()
