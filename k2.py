@@ -42,7 +42,7 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
 
     # 評価用ディレクトリ
     fold_valuation_dir = os.path.join(valuation_dir, f'fold_{fold + 1}')
-    os.makedirs(fold_valuation_dir, exist_ok=True)
+    os.makedirs(fold_valuation_dir, exist_ok=True)  # ディレクトリ作成
 
     # モデル評価
     # fold_model_paths から各foldのモデルファイルをロード
@@ -55,7 +55,7 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
         subjects=groups[test_index],
         model_path=model_path,  # 各foldごとのモデルを評価に使用
         label_encoder_path=os.path.join(output_dir, 'label_encoder.json'),
-        output_path=fold_valuation_dir
+        output_path=fold_valuation_dir  # 結果を保存するディレクトリ
     )
 
 print("評価が完了しました。")
