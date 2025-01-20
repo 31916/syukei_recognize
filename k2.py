@@ -1,5 +1,3 @@
-### 評価プログラム
-
 import os
 import json
 import numpy as np
@@ -47,11 +45,15 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
     os.makedirs(fold_valuation_dir, exist_ok=True)
 
     # モデル評価
+    # fold_model_paths から各foldのモデルファイルをロード
+    model_path = model_path  # 各foldごとのモデルファイルパスが保存されている
+
+    # モデル評価の呼び出し
     evaluate_model_with_visualization(
         X=X_test,
         y=Y_test,
         subjects=groups[test_index],
-        model_path=model_path,
+        model_path=model_path,  # 各foldごとのモデルを評価に使用
         label_encoder_path=os.path.join(output_dir, 'label_encoder.json'),
         output_path=fold_valuation_dir
     )

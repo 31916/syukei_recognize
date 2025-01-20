@@ -1,7 +1,6 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
 import seaborn as sns
 import sys
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
@@ -62,7 +61,7 @@ def evaluate_model_with_visualization(
         label_accuracy = {
             label: {
                 "correct": int(cm[i, i]),
-                "total": int(sum(cm[i])),
+                "total": int(sum(cm[i])) ,
                 "accuracy": float(cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0),
             }
             for i, label in enumerate(label_encoder_classes)
@@ -74,7 +73,7 @@ def evaluate_model_with_visualization(
     label_accuracy = {
         label: {
             "correct": int(cm[i, i]),
-            "total": int(sum(cm[i])),
+            "total": int(sum(cm[i])) ,
             "accuracy": float(cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0),
         }
         for i, label in enumerate(label_encoder_classes)
@@ -134,12 +133,18 @@ def evaluate_model_with_visualization(
     print(f"Top-10 predictions saved to {output_path}/top_10_predictions.json")
 
 
-# 実行
-evaluate_model_with_visualization(
-    X=angles,
-    y=labels_one_hot,
-    subjects=subjects,
-    model_path="./do/data/output/model/trained_model.h5",
-    label_encoder_path="./do/data/output/model/label_encoder.json",
-    output_path="./do/data/output/valuation"
-)
+# 修正: `trained_model.h5` ではなく、交差検証用のモデルファイルを使用
+# fold_info.json からモデルパスを取得し、各foldのモデルを評価に使用
+with open('./do/data/output/model/fold_info.json', 'r', encoding='utf-8') as f:
+    fold_model_paths = json.load(f)
+
+for fold, (model_path, test_index) in enumerate(fold_model_paths):
+    print(f"Evaluating fold {fold + 1}")
+    evaluate_model_with_visualization(
+        X=angles,
+        y=labels_one_hot,
+        subjects=subjects,
+        model_path=model_path,  # 各foldごとのモデルを使用
+        label_encoder_path="./do/data/output/model/label_encoder.json",
+        output_path=f"./do/data/output/valuation/fold_{fold + 1}"
+    )
