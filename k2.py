@@ -6,7 +6,7 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix
 from tensorflow.keras.models import load_model
 from valuation import evaluate_model_with_visualization
-from learn import clean_data
+from learn import clean_data, prepare_data
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
 
@@ -42,7 +42,9 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
 
     # 評価用ディレクトリ
     fold_valuation_dir = os.path.join(valuation_dir, f'fold_{fold + 1}')
-    os.makedirs(fold_valuation_dir, exist_ok=True)  # ディレクトリ作成
+    
+    # 必要なディレクトリがない場合、親ディレクトリから再帰的に作成
+    os.makedirs(fold_valuation_dir, exist_ok=True)
 
     # モデル評価
     # fold_model_paths から各foldのモデルファイルをロード
