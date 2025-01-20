@@ -24,7 +24,7 @@ def clean_data(array):
 def prepare_data(data_dir):
     angles, labels, subjects = [], [], []
 
-    excluded_labels = {"09", "17", "18", "28"}  # Set of label prefixes to exclude
+    excluded_labels = {"09", "17", "18", "28", "64"}  # Set of label prefixes to exclude
 
     for file_name in os.listdir(data_dir):
         if file_name.endswith('.json'):

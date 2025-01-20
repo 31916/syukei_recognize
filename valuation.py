@@ -54,6 +54,22 @@ def evaluate_model_with_visualization(
     plt.savefig(f"{output_path}/confusion_matrix.png")
     plt.close()
 
+    # 混同行列のサイズを取得
+    num_classes = cm.shape[0]
+
+    # インデックスが範囲内であるかを確認
+    if len(label_encoder_classes) == num_classes:
+        label_accuracy = {
+            label: {
+                "correct": int(cm[i, i]),
+                "total": int(sum(cm[i])),
+                "accuracy": float(cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0),
+            }
+            for i, label in enumerate(label_encoder_classes)
+        }
+    else:
+        print(f"Warning: Mismatch between number of classes in confusion matrix and label encoder. Classes in cm: {num_classes}, in encoder: {len(label_encoder_classes)}")
+
     # 各ラベルの精度計算
     label_accuracy = {
         label: {
