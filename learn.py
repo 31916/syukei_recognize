@@ -27,57 +27,77 @@ def clean_data(array):
 
 
 # データ準備
-def prepare_data(data_dir):
+def prepare_data(data_dir, random_seed=42, save_selected=False, selected_data_path=None):
+    """
+    データ準備と固定化されたランダム選択を行う。
+    必要に応じて選択データを保存または再利用。
+
+    Args:
+        data_dir (str): データディレクトリのパス。
+        random_seed (int): ランダムシード値（デフォルト: 42）。
+        save_selected (bool): 選択したデータを保存するかどうか。
+        selected_data_path (str): 保存または読み込み用のパス。
+
+    Returns:
+        X (np.array): 特徴量。
+        Y (np.array): ラベル。
+        groups (np.array): グループ（被験者 ID）。
+    """
+    np.random.seed(random_seed)  # シードを固定してランダム性を再現可能に
     angles, labels, subjects = [], [], []
+    excluded_labels = {"09", "17", "18", "28", "64"}  # 除外するラベル
 
-    excluded_labels = {"09", "17", "18", "28", "64"}  # 除外するラベルの接頭辞
+    selected_data = {}
 
-    for file_name in os.listdir(data_dir):
-        if file_name.endswith('.json'):
-            hand_shape_label = file_name.split('_')[1].split('.')[0]
-            subject_id = file_name.split('_')[0]
+    if selected_data_path and os.path.exists(selected_data_path):
+        # 保存されたデータをロード
+        with open(selected_data_path, 'r', encoding='utf-8') as f:
+            selected_data = json.load(f)
+    else:
+        # データの選択と準備
+        for file_name in os.listdir(data_dir):
+            if file_name.endswith('.json'):
+                hand_shape_label = file_name.split('_')[1].split('.')[0]
+                subject_id = file_name.split('_')[0]
 
-            # 除外ラベルチェック
-            label_prefix = hand_shape_label[:2]
-            if label_prefix in excluded_labels:
-                continue
+                # 除外ラベルをスキップ
+                if hand_shape_label[:2] in excluded_labels:
+                    continue
 
-            with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                with open(os.path.join(data_dir, file_name), 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
-            # データ整合性チェック
-            if not data or any('angles' not in entry or 'rl' not in entry for entry in data):
-                continue
+                if not data or any('angles' not in entry or 'rl' not in entry for entry in data):
+                    continue
 
-            # 左右別にデータを分ける
-            right_hand_data = [entry for entry in data if entry.get('rl') == 1]
-            left_hand_data = [entry for entry in data if entry.get('rl') == 0]
+                # 右手と左手のデータを分けて処理
+                right_hand_data = [entry for entry in data if entry.get('rl') == 1]
+                left_hand_data = [entry for entry in data if entry.get('rl') == 0]
 
-            # 各手のデータをサンプリング（最大5件）
-            if right_hand_data:
-                sampled_right_hand_data = np.random.choice(right_hand_data, 5, replace=False) if len(right_hand_data) >= 5 else right_hand_data
-                for entry in sampled_right_hand_data:
-                    if entry.get('angles') is None or np.any(np.isnan(entry.get('angles'))):
-                        continue
-                    angles.append(entry['angles'])
-                    labels.append(hand_shape_label)  # ラベルには左右差は不要
-                    subjects.append(subject_id)
+                selected_data[file_name] = {
+                    "right": np.random.choice(right_hand_data, 5, replace=False).tolist()
+                    if len(right_hand_data) >= 5 else right_hand_data,
+                    "left": np.random.choice(left_hand_data, 5, replace=False).tolist()
+                    if len(left_hand_data) >= 5 else left_hand_data,
+                }
 
-            if left_hand_data:
-                sampled_left_hand_data = np.random.choice(left_hand_data, 5, replace=False) if len(left_hand_data) >= 5 else left_hand_data
-                for entry in sampled_left_hand_data:
-                    if entry.get('angles') is None or np.any(np.isnan(entry.get('angles'))):
-                        continue
-                    angles.append(entry['angles'])
-                    labels.append(hand_shape_label)  # ラベルには左右差は不要
-                    subjects.append(subject_id)
+        # 選択データを保存
+        if save_selected and selected_data_path:
+            with open(selected_data_path, 'w', encoding='utf-8') as f:
+                json.dump(selected_data, f, indent=4)
 
-    # データの変換
+    # データの整形
+    for file_name, data in selected_data.items():
+        for entry in data["right"] + data["left"]:
+            if entry.get('angles') is not None and not np.any(np.isnan(entry.get('angles'))):
+                angles.append(entry['angles'])
+                labels.append(file_name.split('_')[1].split('.')[0])  # ラベル
+                subjects.append(file_name.split('_')[0])  # 被験者 ID
+
     X = np.array(angles)
     Y = np.array(labels)
     groups = np.array(subjects)
 
-    # 必要に応じてデータの形状を修正
     if X.ndim == 1:
         X = X.reshape(-1, 1)
 

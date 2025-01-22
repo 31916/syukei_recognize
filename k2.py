@@ -1,11 +1,7 @@
 import os
 import json
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import confusion_matrix
 from tensorflow.keras.models import load_model
-from valuation import evaluate_model_with_visualization
 from learn import clean_data, prepare_data
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
@@ -28,12 +24,10 @@ with open(os.path.join(output_dir, 'label_encoder.json'), 'r', encoding='utf-8')
 
 # データを再準備
 X, Y, groups = prepare_data(data_dir)
-Y_encoded = LabelEncoder().fit_transform(Y)
-Y_one_hot = to_categorical(Y_encoded)
-
-# ラベルエンコーダーのインスタンスを作成
 label_encoder = LabelEncoder()
-label_encoder.fit(label_encoder_classes)
+label_encoder.classes_ = np.array(label_encoder_classes)
+Y_encoded = label_encoder.transform(Y)
+Y_one_hot = to_categorical(Y_encoded)
 
 print("Registered labels:", label_encoder.classes_)
 
@@ -44,9 +38,7 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
     # テストデータの準備
     X_test = clean_data(X[test_index])
     Y_test = Y_one_hot[test_index]
-    true_labels = groups[test_index]  # ラベル（数値に変換する前のオリジナル）
-
-    print("True labels in this fold:", set(true_labels))
+    true_labels = Y[test_index]
 
     # 評価用ディレクトリ
     fold_valuation_dir = os.path.join(valuation_dir, f'fold_{fold + 1}')
@@ -57,88 +49,57 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
 
     # モデルの予測
     predictions = model.predict(X_test)
+
+    # Top-10予測の保存
+    top_10_predictions = []
+    for i, probs in enumerate(predictions):
+        top_indices = np.argsort(probs)[::-1][:10]
+        top_labels = label_encoder.inverse_transform(top_indices)
+        top_probs = probs[top_indices]
+        top_10_predictions.append({
+            "true_label": true_labels[i],
+            "top_10": [
+                {"label": top_labels[j], "probability": float(top_probs[j])}
+                for j in range(len(top_labels))
+            ]
+        })
+
+    top_10_save_path = os.path.join(fold_valuation_dir, 'top_10_predictions.json')
+    with open(top_10_save_path, 'w', encoding='utf-8') as f:
+        json.dump(top_10_predictions, f, indent=4)
+
+    # クラスごとの精度計算
     predicted_labels = np.argmax(predictions, axis=1)
     true_labels_encoded = label_encoder.transform(true_labels)
+    correct_per_class = np.zeros(len(label_encoder.classes_), dtype=int)
+    total_per_class = np.zeros(len(label_encoder.classes_), dtype=int)
 
-    # 混同行列を計算
-    cm = confusion_matrix(true_labels_encoded, predicted_labels)
+    for true_label, pred_label in zip(true_labels_encoded, predicted_labels):
+        total_per_class[true_label] += 1
+        if true_label == pred_label:
+            correct_per_class[true_label] += 1
 
-    # ラベルごとの統計を計算
-    label_accuracy = {}
-    for i, label in enumerate(label_encoder.classes_):
-        correct = cm[i, i]
-        total = cm[i, :].sum()
-        accuracy = correct / total if total > 0 else 0.0
-        label_accuracy[label] = {"correct": correct, "total": total, "accuracy": accuracy}
+    accuracy_per_label = {
+        label_encoder.classes_[i]: {
+            "correct": int(correct_per_class[i]),
+            "total": int(total_per_class[i]),
+            "accuracy": float(correct_per_class[i] / total_per_class[i] if total_per_class[i] > 0 else 0)
+        }
+        for i in range(len(label_encoder.classes_))
+    }
+
+    # 平均精度計算
+    mean_accuracy = float(np.mean([v["accuracy"] for v in accuracy_per_label.values() if v["total"] > 0]))
 
     # 結果を保存
-    results = {
-        "mean_accuracy": np.mean([label["accuracy"] for label in label_accuracy.values()]),
-        "variance_accuracy": np.var([label["accuracy"] for label in label_accuracy.values()]),
-        "label_accuracy": label_accuracy
-    }
-    with open(os.path.join(fold_valuation_dir, 'results.json'), 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=4)
+    results_save_path = os.path.join(fold_valuation_dir, 'results.json')
+    with open(results_save_path, 'w', encoding='utf-8') as f:
+        json.dump({
+            "mean_accuracy": mean_accuracy,
+            "accuracy_per_label": accuracy_per_label
+        }, f, indent=4)
 
-print("評価が完了しました。")
+    print(f"Top-10 predictions saved to {top_10_save_path}")
+    print(f"Results saved to {results_save_path}")
 
-
-# 統合された混同行列を作成する関数
-def integrate_confusion_matrices(fold_model_paths, X, Y, label_encoder_classes, output_dir):
-    # 各foldで計算された混同行列を合計するための初期化
-    total_cm = np.zeros((len(label_encoder_classes), len(label_encoder_classes)), dtype=int)
-    
-    # 各foldでの評価
-    for fold, (model_path, test_index) in enumerate(fold_model_paths):
-        print(f"Evaluating fold {fold + 1}")
-        
-        # テストデータの準備
-        X_test = X[test_index]
-        Y_test = Y[test_index]
-        
-        # モデルをロード
-        model = load_model(model_path)
-        
-        # 予測を取得
-        predictions = model.predict(X_test)
-        predicted_labels = np.argmax(predictions, axis=1)
-        
-        # true_labelsを数値ラベルに変換
-        true_labels = label_encoder.transform(Y_test)  # 文字列ラベルを数値ラベルに変換
-
-        # 混同行列を計算
-        cm = confusion_matrix(true_labels, predicted_labels)
-        
-        # 合計する
-        total_cm += cm
-
-    # 統合した混同行列をプロットして保存
-    plt.figure(figsize=(14, 12))  # 画像サイズをさらに大きく調整
-    sns.heatmap(total_cm, annot=True, fmt="d", cmap="Blues", xticklabels=label_encoder_classes, yticklabels=label_encoder_classes,
-                cbar_kws={'label': 'Count'}, annot_kws={'size': 14}, linewidths=1, linecolor='black')  # セルの間に線を入れ、アノテーションの文字を大きく
-
-    # タイトルとラベルのフォントサイズを変更
-    plt.title("Integrated Confusion Matrix", fontsize=18)
-    plt.xlabel("Predicted Labels", fontsize=16)
-    plt.ylabel("True Labels", fontsize=16)
-
-    # x軸（予測ラベル）を縦に表示
-    plt.xticks(rotation=90, fontsize=7)  # x軸ラベルを縦向きにしてフォントサイズを設定
-    plt.yticks(rotation=0, fontsize=7)  # y軸ラベルのフォントサイズを設定
-
-    # ラベルとラベルの間隔を広げるための調整
-    plt.subplots_adjust(left=0.1, right=0.2, top=0.2, bottom=0.1)  # プロットの余白を広げてラベル間隔を増やす
-
-    # レイアウトを調整して画像を小さく
-    plt.tight_layout()
-
-    # 結果を画像として保存（高解像度で保存）
-    plt.savefig(f"{output_dir}/integrated_confusion_matrix_wider_labels_vertical_predicted.png", dpi=300)  # 解像度を高く設定
-    plt.close()
-
-
-
-# 統合した混同行列を作成
-integrate_confusion_matrices(fold_model_paths, X, Y, label_encoder_classes, valuation_dir)
-
-print("評価が完了しました。")
+print("Evaluation completed.")

@@ -13,7 +13,12 @@ data_dir = './do/data/output/hand_info'
 output_dir = './do/data/output/model'
 
 # データを準備
-X, Y, groups = prepare_data(data_dir)
+X, Y, groups = prepare_data(
+    data_dir='./do/data/output/hand_info',
+    random_seed=42,
+    save_selected=True,
+    selected_data_path='./do/data/output/model/selected_data.json'
+)
 
 # ラベルエンコーディング
 label_encoder = LabelEncoder()
