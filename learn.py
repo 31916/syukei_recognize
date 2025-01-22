@@ -95,7 +95,7 @@ def train_model(X, Y, output_dir):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     # 学習の実行
-    model.fit(clean_data(X), clean_data(Y_one_hot), epochs=50, batch_size=16, verbose=1)
+    model.fit(clean_data(X), clean_data(Y_one_hot), epochs=100, batch_size=16, verbose=1)
 
     # モデルとラベルエンコーダーの保存
     os.makedirs(output_dir, exist_ok=True)

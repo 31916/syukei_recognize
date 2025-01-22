@@ -41,7 +41,7 @@ for fold, (train_index, test_index) in enumerate(kf.split(X, Y, groups=groups)):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.fit(
-        clean_data(X_train), clean_data(Y_train), epochs=50, batch_size=16, verbose=1
+        clean_data(X_train), clean_data(Y_train), epochs=100, batch_size=16, verbose=1
     )
 
     # モデル保存
