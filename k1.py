@@ -41,12 +41,15 @@ for fold, (train_index, test_index) in enumerate(kf.split(X, Y, groups=groups)):
     X_train, X_test = X[train_index], X[test_index]
     Y_train, Y_test = Y_one_hot[train_index], Y_one_hot[test_index]
 
+    # データのクリーニング
+    X_train_clean, Y_train_clean = clean_data(X_train, Y_train)
+
     # モデル作成とトレーニング
-    model = create_model(input_shape=(X_train.shape[1],), num_classes=Y_one_hot.shape[1])
+    model = create_model(input_shape=(X_train_clean.shape[1],), num_classes=Y_one_hot.shape[1])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
     model.fit(
-        clean_data(X_train), clean_data(Y_train), epochs=100, batch_size=16, verbose=1
+        X_train_clean, Y_train_clean, epochs=100, batch_size=16, verbose=1
     )
 
     # モデル保存

@@ -36,8 +36,7 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
     print(f"Evaluating fold {fold + 1}")
 
     # テストデータの準備
-    X_test = clean_data(X[test_index])
-    Y_test = Y_one_hot[test_index]
+    X_test_clean, Y_test_clean = clean_data(X[test_index], Y[test_index])
     true_labels = Y[test_index]
 
     # 評価用ディレクトリ
@@ -48,7 +47,7 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
     model = load_model(model_path)
 
     # モデルの予測
-    predictions = model.predict(X_test)
+    predictions = model.predict(X_test_clean)
 
     # Top-10予測の保存
     top_10_predictions = []

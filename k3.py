@@ -1,5 +1,6 @@
 import json
 from collections import defaultdict
+import numpy as np
 
 # 各FOLDのファイルパス
 top_10_files = [
@@ -47,9 +48,11 @@ for top_10_file in top_10_files:
 
 # results.jsonを集約
 total_mean_accuracy = 0
+mean_accuracies = []  # 追加: mean_accuracy を収集するリスト
 for results_file in results_files:
     with open(results_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
+        mean_accuracies.append(data['mean_accuracy'])  # 追加: mean_accuracy を収集
         total_mean_accuracy += data['mean_accuracy']
         for label, stats in data['accuracy_per_label'].items():
             label_no_rl = remove_rl(label)
@@ -58,6 +61,8 @@ for results_file in results_files:
 
 # 平均精度を計算
 total_mean_accuracy /= len(results_files)
+total_variance = np.var(mean_accuracies)  # 追加: 分散を計算
+
 accuracy_per_label = {
     label: {
         'correct': stats['correct'],
@@ -111,9 +116,11 @@ with open(output_top1, 'w', encoding='utf-8') as f:
 with open(output_results, 'w', encoding='utf-8') as f:
     json.dump({
         'mean_accuracy': total_mean_accuracy,
+        'variance': total_variance,  # 追加: 分散を記録
         'accuracy_per_label': accuracy_per_label
     }, f, indent=4, ensure_ascii=False)
 
 print(f"TOP5予測結果を '{output_top5}' に保存しました。")
-print(f"TOP1評価結果を '{output_top1}' に保存しました。")
-print(f"統合結果を '{output_results}' に保存しました。")
+print(f"TOP1予測結果を '{output_top1}' に保存しました。")
+print(f"全体の結果を '{output_results}' に保存しました。")
+print(f"全体の分散: {total_variance}")
