@@ -1,117 +1,135 @@
 import os
 import json
-import numpy as np
-from tensorflow.keras.models import load_model
-from sklearn.metrics import confusion_matrix
-from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.utils import to_categorical
 from collections import defaultdict
-from learn import prepare_data, clean_data
 
-# ディレクトリの設定
-output_dir = './do/data/output/model'
-valuation_dir = './do/data/output/valuation'
-data_dir = './do/data/output/hand_info'
+def load_json(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
-os.makedirs(valuation_dir, exist_ok=True)
+def save_json(data, file_path):
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
-# モデルパスとテストデータインデックスを読み込み
-with open(os.path.join(output_dir, 'fold_info.json'), 'r', encoding='utf-8') as f:
-    fold_model_paths = json.load(f)
+def normalize_labels(label, label_mapping):
+    """Normalize labels using the mapping from label_encoder.json to normalized_label_encoder.json."""
+    for normalized_label in label_mapping:
+        if label.startswith(normalized_label):
+            return normalized_label
+    return label
 
-# データ準備（左右の差を無視）
-X, Y, groups = prepare_data(data_dir)
+def process_fold(fold_dir, label_mapping):
+    """Process a single fold's evaluation data."""
+    # Load data
+    top_10_predictions = load_json(os.path.join(fold_dir, 'top_10_predictions.json'))
+    results = load_json(os.path.join(fold_dir, 'results.json'))
 
-# ラベルから左右識別（l/r）を削除
-Y_normalized = np.array([label[:-1] if label[-1] in ['l', 'r'] else label for label in Y])
+    # Normalize results
+    normalized_results = {
+        "mean_accuracy": 0,
+        "variance_accuracy": 0,
+        "label_accuracy": defaultdict(lambda: {"correct": 0, "total": 0, "accuracy": 0.0})
+    }
 
-# ラベルをエンコード
-label_encoder = LabelEncoder()
-Y_encoded = label_encoder.fit_transform(Y_normalized)
-Y_one_hot = to_categorical(Y_encoded)
+    for label, stats in results["label_accuracy"].items():
+        normalized_label = normalize_labels(label, label_mapping)
+        normalized_results["label_accuracy"][normalized_label]["correct"] += stats["correct"]
+        normalized_results["label_accuracy"][normalized_label]["total"] += stats["total"]
 
-# エンコーダを保存
-with open(os.path.join(output_dir, 'normalized_label_encoder.json'), 'w', encoding='utf-8') as f:
-    json.dump(label_encoder.classes_.tolist(), f, ensure_ascii=False, indent=4)
+    for label, stats in normalized_results["label_accuracy"].items():
+        stats["accuracy"] = stats["correct"] / stats["total"] if stats["total"] > 0 else 0.0
 
-# ラベルマッピングの作成
-original_labels = [f"{str(i).zfill(2)}l" for i in range(1, 60)] + [f"{str(i).zfill(2)}r" for i in range(1, 60)]
-normalized_labels = [f"{str(i).zfill(2)}" for i in range(1, 60)] * 2
-label_mapping = {orig: norm for orig, norm in zip(original_labels, normalized_labels)}
+    normalized_results["mean_accuracy"] = sum(
+        stats["accuracy"] for stats in normalized_results["label_accuracy"].values()
+    ) / len(normalized_results["label_accuracy"])
 
-# デバッグ：ラベルマッピングの確認
-print("ラベルマッピングの内容:", label_mapping)
-print("エンコーダのラベル数:", len(label_encoder.classes_))
-print("エンコーダのラベル一覧:", label_encoder.classes_)
+    # Normalize top-10 predictions
+    normalized_top_10 = []
+    for prediction in top_10_predictions:
+        true_label = normalize_labels(prediction["true_label"], label_mapping)
+        normalized_top_10_labels = []
 
-# 評価結果を格納するリスト
-all_results = []
-all_top_10_predictions = []
-label_accuracy = defaultdict(lambda: {"correct": 0, "total": 0, "accuracy": 0.0})
+        for label_data in prediction["top_10_labels"]:
+            label = normalize_labels(label_data["label"], label_mapping)
+            score = label_data["score"]
 
-for fold, (model_path, test_index) in enumerate(fold_model_paths):
-    print(f"Fold {fold + 1} の評価を開始します")
+            # Aggregate scores for identical normalized labels
+            found = False
+            for entry in normalized_top_10_labels:
+                if entry["label"] == label:
+                    entry["score"] += score
+                    found = True
+                    break
 
-    # モデルの読み込み
-    model = load_model(model_path)
+            if not found:
+                normalized_top_10_labels.append({"label": label, "score": score})
 
-    # テストデータの準備
-    X_test = clean_data(X[test_index])
-    Y_test = Y_one_hot[test_index]
+        # Normalize scores to percentage
+        total_score = sum(item["score"] for item in normalized_top_10_labels)
+        for item in normalized_top_10_labels:
+            item["score"] = (item["score"] / total_score) * 100 if total_score > 0 else 0
 
-    # モデルの予測
-    predictions = model.predict(X_test)
-    predicted_labels = np.argmax(predictions, axis=1)
-    true_labels = np.argmax(Y_test, axis=1)
-
-    # 各foldの評価結果を保存
-    fold_valuation_dir = os.path.join(valuation_dir, f'fold_{fold + 1}')
-    os.makedirs(fold_valuation_dir, exist_ok=True)
-
-    fold_top_10_predictions = []
-
-    # デバッグ：ラベルと予測内容を確認
-    for true_label, pred in zip(true_labels[:10], predictions[:10]):  # 最初の10件を確認
-        true_label_str = label_encoder.classes_[true_label]
-        true_label_mapped = label_mapping.get(true_label_str, "")
-        print(f"True Label: {true_label_str}, Mapped: {true_label_mapped}")
-
-        top_10_indices = np.argsort(pred)[-10:][::-1]
-        top_10_labels = [
-            {"label": label_mapping.get(label_encoder.classes_[i], ""), "score": float(pred[i])}
-            for i in top_10_indices if i < len(label_encoder.classes_)
-        ]
-        print("Top 10 Labels:", top_10_labels)
-
-        fold_top_10_predictions.append({
-            "true_label": true_label_mapped,
-            "top_10_labels": top_10_labels
+        normalized_top_10.append({
+            "true_label": true_label,
+            "top_10_labels": sorted(normalized_top_10_labels, key=lambda x: x["score"], reverse=True)
         })
 
-        if top_10_labels and true_label_mapped == top_10_labels[0]["label"]:
-            label_accuracy[true_label_mapped]["correct"] += 1
-        label_accuracy[true_label_mapped]["total"] += 1
+    return normalized_results, normalized_top_10
 
-    all_top_10_predictions.extend(fold_top_10_predictions)
+def integrate_folds(valuation_dir, output_dir, label_mapping):
+    """Integrate all folds' evaluation data."""
+    os.makedirs(output_dir, exist_ok=True)
 
-# 正確な統合結果を計算
-for label, stats in label_accuracy.items():
-    if stats["total"] > 0:
-        stats["accuracy"] = stats["correct"] / stats["total"]
+    all_results = []
+    all_top_10 = []
 
-mean_accuracy = sum(stats["correct"] for stats in label_accuracy.values()) / \
-                sum(stats["total"] for stats in label_accuracy.values())
+    for fold_num in range(1, 6):
+        fold_dir = os.path.join(valuation_dir, f'fold_{fold_num}')
+        fold_results, fold_top_10 = process_fold(fold_dir, label_mapping)
 
-rl_results = {
-    "mean_accuracy": mean_accuracy,
-    "label_accuracy": label_accuracy,
-}
+        all_results.append(fold_results)
+        all_top_10.extend(fold_top_10)
 
-# 結果を保存
-with open(os.path.join(valuation_dir, 'rl_results.json'), 'w', encoding='utf-8') as f:
-    json.dump(rl_results, f, indent=4)
+        # Save fold results
+        save_json(fold_results, os.path.join(fold_dir, 'rl_result.json'))
+        save_json(fold_top_10, os.path.join(fold_dir, 'rl_top10prediction.json'))
 
-with open(os.path.join(valuation_dir, 'rl_top_10_predictions.json'), 'w', encoding='utf-8') as f:
-    json.dump(all_top_10_predictions, f, indent=4)
+    # Aggregate results across all folds
+    integrated_results = {
+        "mean_accuracy": sum(result["mean_accuracy"] for result in all_results) / len(all_results),
+        "label_accuracy": defaultdict(lambda: {"correct": 0, "total": 0, "accuracy": 0.0})
+    }
 
-print(f"統合された結果が {valuation_dir} に保存されました。")
+    for result in all_results:
+        for label, stats in result["label_accuracy"].items():
+            integrated_results["label_accuracy"][label]["correct"] += stats["correct"]
+            integrated_results["label_accuracy"][label]["total"] += stats["total"]
+
+    for label, stats in integrated_results["label_accuracy"].items():
+        stats["accuracy"] = stats["correct"] / stats["total"] if stats["total"] > 0 else 0.0
+
+    # Save integrated results
+    save_json(integrated_results, os.path.join(output_dir, 'rl_final_result.json'))
+    save_json(all_top_10, os.path.join(output_dir, 'rl_final_top10prediction.json'))
+
+if __name__ == '__main__':
+    valuation_dir = './do/data/output/valuation'
+    output_dir = './do/data/output/valuation'
+
+    # Load label mappings
+    original_labels = load_json('./do/data/output/model/label_encoder.json')
+    normalized_labels = load_json('./do/data/output/model/normalized_label_encoder.json')
+
+    # 修正されたラベルマッピング生成部分
+    label_mapping = {}
+
+    for original_label in original_labels:
+        # Remove the 'l' or 'r' suffix from the label to match normalized labels
+        normalized_label = original_label[:-1]  # Exclude the last character ('l' or 'r')
+        if normalized_label in normalized_labels:
+            label_mapping[original_label] = normalized_label
+        else:
+            print(f"Warning: Normalized label not found for {original_label}")
+
+
+    # Process and integrate
+    integrate_folds(valuation_dir, output_dir, label_mapping)
