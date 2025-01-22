@@ -35,6 +35,8 @@ Y_one_hot = to_categorical(Y_encoded)
 label_encoder = LabelEncoder()
 label_encoder.fit(label_encoder_classes)
 
+print("Registered labels:", label_encoder.classes_)
+
 # 各foldの評価
 for fold, (model_path, test_index) in enumerate(fold_model_paths):
     print(f"Evaluating fold {fold + 1}")
@@ -42,26 +44,44 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
     # テストデータの準備
     X_test = clean_data(X[test_index])
     Y_test = Y_one_hot[test_index]
+    true_labels = groups[test_index]  # ラベル（数値に変換する前のオリジナル）
+
+    print("True labels in this fold:", set(true_labels))
 
     # 評価用ディレクトリ
     fold_valuation_dir = os.path.join(valuation_dir, f'fold_{fold + 1}')
-    
-    # 必要なディレクトリがない場合、親ディレクトリから再帰的に作成
     os.makedirs(fold_valuation_dir, exist_ok=True)
 
-    # モデル評価
-    # fold_model_paths から各foldのモデルファイルをロード
-    model_path = model_path  # 各foldごとのモデルファイルパスが保存されている
+    # モデルをロード
+    model = load_model(model_path)
 
-    # モデル評価の呼び出し
-    evaluate_model_with_visualization(
-        X=X_test,
-        y=Y_test,
-        subjects=groups[test_index],
-        model_path=model_path,  # 各foldごとのモデルを評価に使用
-        label_encoder_path=os.path.join(output_dir, 'label_encoder.json'),
-        output_path=fold_valuation_dir  # 結果を保存するディレクトリ
-    )
+    # モデルの予測
+    predictions = model.predict(X_test)
+    predicted_labels = np.argmax(predictions, axis=1)
+    true_labels_encoded = label_encoder.transform(true_labels)
+
+    # 混同行列を計算
+    cm = confusion_matrix(true_labels_encoded, predicted_labels)
+
+    # ラベルごとの統計を計算
+    label_accuracy = {}
+    for i, label in enumerate(label_encoder.classes_):
+        correct = cm[i, i]
+        total = cm[i, :].sum()
+        accuracy = correct / total if total > 0 else 0.0
+        label_accuracy[label] = {"correct": correct, "total": total, "accuracy": accuracy}
+
+    # 結果を保存
+    results = {
+        "mean_accuracy": np.mean([label["accuracy"] for label in label_accuracy.values()]),
+        "variance_accuracy": np.var([label["accuracy"] for label in label_accuracy.values()]),
+        "label_accuracy": label_accuracy
+    }
+    with open(os.path.join(fold_valuation_dir, 'results.json'), 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=4)
+
+print("評価が完了しました。")
+
 
 # 統合された混同行列を作成する関数
 def integrate_confusion_matrices(fold_model_paths, X, Y, label_encoder_classes, output_dir):
