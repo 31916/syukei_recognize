@@ -20,9 +20,9 @@ results_files = [
 ]
 
 # 集計結果ファイル
-output_top5 = './do/data/output/valuation/top5_predictions.json'
-output_top1 = './do/data/output/valuation/top1_results.json'
-output_results = './do/data/output/valuation/consolidated_results.json'
+output_top5 = './do/data/output/valuation/rl_top5.json'
+output_top1 = './do/data/output/valuation/rl_result.json'
+output_results = './do/data/output/valuation/final_results.json'
 
 # 左右を無視して数字部分を抽出する関数
 def remove_rl(label):
@@ -51,20 +51,41 @@ for top_10_file in top_10_files:
 
 # `results.json` の集約 (左右差あり)
 aggregated_results = defaultdict(lambda: {"correct": 0, "total": 0})
-mean_accuracies = []
+mean_accuracies_rl = []  # 左右差なし用
+mean_accuracies_final = []  # 左右差あり用
+
+# 左右差なしの正解数と合計を計算
+total_correct_rl = defaultdict(lambda: {"correct": 0, "total": 0})
 
 for results_file in results_files:
     with open(results_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
-        mean_accuracies.append(data['mean_accuracy'])
+        mean_accuracies_final.append(data['mean_accuracy'])  # 左右差あり
+
         for label, stats in data['accuracy_per_label'].items():
-            # ラベルはそのまま（左右差あり）
+            rl_label = remove_rl(label)
+            total_correct_rl[rl_label]['correct'] += stats['correct']
+            total_correct_rl[rl_label]['total'] += stats['total']
+
+            # 集約結果 (左右差あり)
             aggregated_results[label]['correct'] += stats['correct']
             aggregated_results[label]['total'] += stats['total']
 
-# 平均精度と分散を計算
-total_mean_accuracy = np.mean(mean_accuracies)
-total_variance = np.var(mean_accuracies)
+# 左右差なしの精度を計算
+total_mean_accuracy_rl = np.mean([
+    stats['correct'] / stats['total'] if stats['total'] > 0 else 0
+    for stats in total_correct_rl.values()
+])
+
+# 左右差なしの分散を計算
+mean_accuracies_rl = [
+    stats['correct'] / stats['total'] if stats['total'] > 0 else 0
+    for stats in total_correct_rl.values()
+]
+total_variance_rl = np.var(mean_accuracies_rl)
+
+# 左右差ありの分散を計算
+total_variance_final = np.var(mean_accuracies_final)
 
 # `accuracy_per_label` を計算
 accuracy_per_label = {
@@ -109,18 +130,25 @@ with open(output_top5, 'w', encoding='utf-8') as f:
 
 with open(output_top1, 'w', encoding='utf-8') as f:
     json.dump({
-        'mean_accuracy': top1_mean_accuracy,
-        'accuracy_per_label': top1_accuracy
+        'mean_accuracy': total_mean_accuracy_rl,
+        'variance': total_variance_rl,  # RL用分散を追加
+        'accuracy_per_label': {
+            label: {
+                'correct': stats['correct'],
+                'total': stats['total'],
+                'accuracy': stats['correct'] / stats['total'] if stats['total'] > 0 else 0
+            }
+            for label, stats in total_correct_rl.items()
+        }
     }, f, indent=4, ensure_ascii=False)
 
 with open(output_results, 'w', encoding='utf-8') as f:
     json.dump({
-        'mean_accuracy': total_mean_accuracy,
-        'variance': total_variance,
+        'mean_accuracy': np.mean(mean_accuracies_final),
+        'variance': total_variance_final,
         'accuracy_per_label': accuracy_per_label
     }, f, indent=4, ensure_ascii=False)
 
 print(f"TOP5予測結果を '{output_top5}' に保存しました。")
-print(f"TOP1予測結果を '{output_top1}' に保存しました。")
-print(f"全体の結果を '{output_results}' に保存しました。")
-print(f"全体の分散: {total_variance}")
+print(f"RL結果の平均精度: {total_mean_accuracy_rl}, 分散: {total_variance_rl}")
+print(f"全体の平均精度: {np.mean(mean_accuracies_final)}, 分散: {total_variance_final}")
