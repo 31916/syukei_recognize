@@ -17,10 +17,11 @@ mp_drawing = mp.solutions.drawing_utils
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
 # ブレを判定するスレッショルド値
-THRESHOLD = 5  # フレーム間での許容移動距離
+THRESHOLD = 15  # フレーム間での許容移動距離
 
-def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos, THRESHOLD=10.0):
+def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir_landmark, output_dir_pos):
     video_name = os.path.splitext(os.path.basename(video_path))[0]
+    global THRESHOLD
 
     # 出力ディレクトリのパスを設定
     save_frame_dir = os.path.join(output_dir_frame, f'{video_name}_frames')
@@ -244,14 +245,11 @@ def angle(pos_r, pos_l):
 def get_hand_orientation(pos):
     # 手首と親指の先端（もしくは中指の先端）の位置から手の向きを判定
     wrist = pos[0]  # 手首のランドマーク
-    index_finger_tip = pos[8]  # 人差し指の先端（例）
-    
-    if np.isnan(wrist[0]) or np.isnan(index_finger_tip[0]):
-        return {"palm_orientation": None, "yaw": None}
+    middle_finger = pos[8]  # 中指の先端
     
     # 手のひらがカメラ向きか手の甲がカメラ向きかを判断
-    palm_orientation = np.sign(index_finger_tip[1] - wrist[1])  # 上向きか下向きか
-    yaw = np.arctan2(index_finger_tip[1] - wrist[1], index_finger_tip[0] - wrist[0])
+    palm_orientation = 1    #改善の余地しかない
+    yaw = np.arctan2(middle_finger[1] - wrist[1], middle_finger[0] - wrist[0])
 
     return {"palm_orientation": palm_orientation, "yaw": yaw}
 

@@ -19,7 +19,6 @@ def prepare_data(data_dir, random_seed=42, save_selected=False, selected_data_pa
         for file_name in os.listdir(data_dir):
             if file_name.endswith('.json'):
                 hand_shape_label = file_name.split('_')[1].split('.')[0]
-                subject_id = file_name.split('_')[0]
                 if hand_shape_label[:2] in excluded_labels:
                     continue
 

@@ -1,5 +1,4 @@
 ### 交差検証を行うプログラム
-
 import os
 import json
 import numpy as np
@@ -64,5 +63,3 @@ print("被験者ごとの5分割交差検証が完了しました。")
 # モデルパスとテストデータインデックスを保存
 with open(os.path.join(output_dir, 'fold_info.json'), 'w', encoding='utf-8') as f:
     json.dump(fold_model_paths, f, ensure_ascii=False, indent=4)
-
-
