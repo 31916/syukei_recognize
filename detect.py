@@ -72,7 +72,6 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
                 hand_info_r.append({
                     "frame": frame_count,
                     "angles": degree_r,
-                    "palm_orientation": hand_orientation_r["palm_orientation"],
                     "yaw": hand_orientation_r["yaw"],
                     "rl": 1
                 })
@@ -81,7 +80,6 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
                 hand_info_l.append({
                     "frame": frame_count,
                     "angles": degree_l,
-                    "palm_orientation": hand_orientation_l["palm_orientation"],
                     "yaw": hand_orientation_l["yaw"],
                     "rl": 0
                 })
@@ -248,10 +246,9 @@ def get_hand_orientation(pos):
     middle_finger = pos[8]  # 中指の先端
     
     # 手のひらがカメラ向きか手の甲がカメラ向きかを判断
-    palm_orientation = 1    #改善の余地しかない
     yaw = np.arctan2(middle_finger[1] - wrist[1], middle_finger[0] - wrist[0])
 
-    return {"palm_orientation": palm_orientation, "yaw": yaw}
+    return {"yaw": yaw}
 
 if __name__ == '__main__':
     main()
