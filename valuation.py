@@ -69,16 +69,6 @@ def evaluate_model_with_visualization(
     else:
         print(f"Warning: Mismatch between number of classes in confusion matrix and label encoder. Classes in cm: {num_classes}, in encoder: {len(label_encoder_classes)}")
 
-    # 各ラベルの精度計算
-    label_accuracy = {
-        label: {
-            "correct": int(cm[i, i]),
-            "total": int(sum(cm[i])) ,
-            "accuracy": float(cm[i, i] / sum(cm[i]) if sum(cm[i]) > 0 else 0),
-        }
-        for i, label in enumerate(label_encoder_classes)
-    }
-
     # ラベルごとの平均と分散を計算
     accuracies = [data["accuracy"] for data in label_accuracy.values()]
     mean_accuracy = float(np.mean(accuracies))
@@ -96,16 +86,25 @@ def evaluate_model_with_visualization(
         for true_label, pred in zip(true_labels, predictions)
     ]
 
-    # 各ラベルごとのスコア平均と分散
-    top_10_stats = {}
-    for entry in top_10_predictions:
-        for top_label in entry["top_10_labels"]:
-            label = top_label["label"]
-            score = top_label["score"]
-            if label not in top_10_stats:
-                top_10_stats[label] = []
-            top_10_stats[label].append(score)
+    # Top-10 予測結果の準備と統計情報の計算
+    top_10_stats = defaultdict(list)
+    top_10_predictions = []
 
+    for true_label, pred in zip(true_labels, predictions):
+        top_indices = np.argsort(pred)[-10:][::-1]  # 上位10個の予測インデックス
+        top_10_labels = [{"label": label_encoder_classes[i], "score": float(pred[i])} for i in top_indices]
+
+        # 結果リストに追加
+        top_10_predictions.append({
+            "true_label": label_encoder_classes[true_label],
+            "top_10_labels": top_10_labels
+        })
+
+        # 各ラベルのスコアを `top_10_stats` に追加
+        for top_label in top_10_labels:
+            top_10_stats[top_label["label"]].append(top_label["score"])
+
+    # 各ラベルごとのスコア平均と分散
     top_10_mean_variance = {
         label: {
             "mean_score": float(np.mean(scores)),
@@ -114,6 +113,7 @@ def evaluate_model_with_visualization(
         }
         for label, scores in top_10_stats.items()
     }
+
 
     # 結果の保存
     with open(f"{output_path}/results.json", "w") as f:

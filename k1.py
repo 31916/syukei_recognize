@@ -5,18 +5,27 @@ import numpy as np
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from learn import prepare_data, create_model, clean_data
 
 # データの準備
 data_dir = './do/data/output/hand_info'
 output_dir = './do/data/output/model'
+selected_data_path = './do/data/output/model/selected_data.json'
+
+# save_selected を定義
+save_selected = True  # または False に変更可能
+
+# ファイルを保存する前にディレクトリが存在するか確認
+if save_selected and selected_data_path:
+    os.makedirs(os.path.dirname(selected_data_path), exist_ok=True)
 
 # データを準備
 X, Y, groups = prepare_data(
     data_dir='./do/data/output/hand_info',
     random_seed=42,
-    save_selected=True,
-    selected_data_path='./do/data/output/model/selected_data.json'
+    save_selected=save_selected,
+    selected_data_path=selected_data_path
 )
 
 # ラベルエンコーディング
@@ -32,6 +41,7 @@ with open(os.path.join(output_dir, 'label_encoder.json'), 'w', encoding='utf-8')
 # 5分割交差検証
 kf = GroupKFold(n_splits=5)
 fold_model_paths = []
+fold_best_info = {}  # 各foldの最良モデル情報を保存
 
 for fold, (train_index, test_index) in enumerate(kf.split(X, Y, groups=groups)):
     print(f"Starting fold {fold + 1}")
@@ -47,19 +57,38 @@ for fold, (train_index, test_index) in enumerate(kf.split(X, Y, groups=groups)):
     model = create_model(input_shape=(X_train_clean.shape[1],), num_classes=Y_one_hot.shape[1])
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    model.fit(
-        X_train_clean, Y_train_clean, epochs=100, batch_size=16, verbose=1
+    # Early Stopping と Model Checkpoint を追加
+    best_model_fold_path = os.path.join(output_dir, f'best_model_fold_{fold + 1}.keras')
+    checkpoint = ModelCheckpoint(best_model_fold_path, save_best_only=True, monitor='val_loss', mode='min')
+    early_stopping = EarlyStopping(monitor='val_loss', patience=30, restore_best_weights=True)
+
+    history = model.fit(
+        X_train_clean, Y_train_clean,
+        epochs=100, batch_size=16, verbose=1,
+        validation_data=(X_test, Y_test),
+        callbacks=[checkpoint, early_stopping]
     )
 
-    # モデル保存
-    fold_model_path = os.path.join(output_dir, f'model_fold_{fold + 1}.h5')
-    model.save(fold_model_path)
+    # 各foldの最良の validation loss を取得
+    min_val_loss = min(history.history['val_loss'])
+
+    # foldごとの最良モデルの情報を保存
+    fold_best_info[f"fold_{fold + 1}"] = {
+        "best_val_loss": min_val_loss,
+        "best_model_path": best_model_fold_path
+    }
 
     # 修正: NumPy 配列をリスト形式に変換して保存
-    fold_model_paths.append((fold_model_path, test_index.tolist()))
+    fold_model_paths.append((best_model_fold_path, test_index.tolist()))
 
 print("被験者ごとの5分割交差検証が完了しました。")
 
 # モデルパスとテストデータインデックスを保存
 with open(os.path.join(output_dir, 'fold_info.json'), 'w', encoding='utf-8') as f:
     json.dump(fold_model_paths, f, ensure_ascii=False, indent=4)
+
+# 各foldの最良モデル情報を JSON に保存
+with open(os.path.join(output_dir, 'best_models_info.json'), 'w', encoding='utf-8') as f:
+    json.dump(fold_best_info, f, ensure_ascii=False, indent=4)
+
+print("各foldの最良モデル情報を best_models_info.json に保存しました。")

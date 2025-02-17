@@ -29,8 +29,6 @@ label_encoder.classes_ = np.array(label_encoder_classes)
 Y_encoded = label_encoder.transform(Y)
 Y_one_hot = to_categorical(Y_encoded)
 
-print("Registered labels:", label_encoder.classes_)
-
 # 各foldの評価
 for fold, (model_path, test_index) in enumerate(fold_model_paths):
     print(f"Evaluating fold {fold + 1}")
@@ -87,14 +85,17 @@ for fold, (model_path, test_index) in enumerate(fold_model_paths):
         for i in range(len(label_encoder.classes_))
     }
 
-    # 平均精度計算
-    mean_accuracy = float(np.mean([v["accuracy"] for v in accuracy_per_label.values() if v["total"] > 0]))
+    # **平均と分散を計算**
+    accuracy_values = [v["accuracy"] for v in accuracy_per_label.values() if v["total"] > 0]
+    mean_accuracy = float(np.mean(accuracy_values))
+    variance_accuracy = float(np.var(accuracy_values))  # **追加: 分散の計算**
 
-    # 結果を保存
+    # **結果を `results.json` に保存**
     results_save_path = os.path.join(fold_valuation_dir, 'results.json')
     with open(results_save_path, 'w', encoding='utf-8') as f:
         json.dump({
             "mean_accuracy": mean_accuracy,
+            "variance_accuracy": variance_accuracy,  # **追加: 分散を保存**
             "accuracy_per_label": accuracy_per_label
         }, f, indent=4)
 

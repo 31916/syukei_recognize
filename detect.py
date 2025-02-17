@@ -50,6 +50,9 @@ def process_video(video_path, output_dir_frame, output_dir_hand_info, output_dir
     cap = cv2.VideoCapture(video_path)
     frame_count = 0
     prev_pos_r, prev_pos_l = None, None  # 前フレームの座標を保持する変数
+    fps = cap.get(cv2.CAP_PROP_FPS)  # 動画のFPSを取得
+    print(f"FPS: {fps}")
+
 
     while True:
         ret, frame = cap.read()
@@ -243,7 +246,7 @@ def angle(pos_r, pos_l):
 def get_hand_orientation(pos):
     # 手首と親指の先端（もしくは中指の先端）の位置から手の向きを判定
     wrist = pos[0]  # 手首のランドマーク
-    middle_finger = pos[8]  # 中指の先端
+    middle_finger = pos[8]  # 人差し指の先端
     
     # 手のひらがカメラ向きか手の甲がカメラ向きかを判断
     yaw = np.arctan2(middle_finger[1] - wrist[1], middle_finger[0] - wrist[0])
