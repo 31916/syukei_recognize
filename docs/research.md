@@ -52,7 +52,7 @@ $$
 実装では `arccos` の入力を $[-1,1]$ に収め、長さ0の辺や無効な座標を持つ角度を除外します。`yaw` は手首（点0）から人差し指先端（点8）への画像平面上の方向です。
 
 $$
-\mathrm{yaw}=\operatorname{atan2}(y_8-y_0,\ x_8-x_0)
+\mathrm{yaw}=\mathrm{atan2}\left(y_8-y_0,\,x_8-x_0\right)
 $$
 
 現在のコードは `yaw` をラジアンで保存します。左右フラグ `rl` とともに JSON には保持しますが、**モデルに入力するのは20角度のみ**です。資料にある「角度・向き・左右を入力」という説明とは相違があります。[データ形式](data-format.md)と[相違点の一覧](sources.md#implementation-differences)を参照してください。
