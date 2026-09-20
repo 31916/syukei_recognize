@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "本リポジトリを参照する際は、このメタデータと利用したコミットを引用してください。研究時の報告値の出典は docs/sources.md に記載しています。"
+type: software
+title: "syukei_recognize: 骨格推定と機械学習を用いた日本手話の手形認識"
+authors:
+  - family-names: "北川"
+    given-names: "温人"
+repository-code: "https://github.com/31916/syukei_recognize"
+url: "https://github.com/31916/syukei_recognize"
+abstract: "高専卒業研究の手形認識コード。MediaPipe の手ランドマークから求めた20角度を用い、全結合ニューラルネットワークと被験者単位の交差検証で日本手話の手形を分類する。"
+keywords:
+  - "Japanese Sign Language"
+  - "handshape recognition"
+  - "MediaPipe"
+  - "subject-grouped cross-validation"

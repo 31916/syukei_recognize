@@ -1,0 +1,3 @@
+condition,accuracy_percent,source_id,source_locator
+side_distinguished,44.25,thesis,左右差のある分類の評価結果;まとめ
+side_ignored,75.09,thesis,左右差のない分類の評価結果;まとめ

@@ -1,0 +1,2 @@
+# Optional: redraw the reported research figures from docs/tables/*.csv.
+matplotlib>=3.8,<4

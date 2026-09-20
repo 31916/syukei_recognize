@@ -1,0 +1,21 @@
+condition,label_id,label_name,accuracy_percent,source_id,source_locator
+side_distinguished,14l,セ型,82.61,thesis,Table 2
+side_distinguished,07r,キ型,82.00,thesis,Table 2
+side_distinguished,14r,セ型,78.26,thesis,Table 2
+side_distinguished,50l,握り拳親,76.00,thesis,Table 2
+side_distinguished,36r,ユ型,73.91,thesis,Table 2
+side_distinguished,50r,握り拳親,8.00,thesis,Table 2
+side_distinguished,52l,握り拳平,8.00,thesis,Table 2
+side_distinguished,52r,握り拳平,8.89,thesis,Table 2
+side_distinguished,61l,Q型,10.00,thesis,Table 2
+side_distinguished,24l,ネ型,12.00,thesis,Table 2
+side_ignored,01,ア型,99.00,thesis,Table 5
+side_ignored,14,セ型,98.91,thesis,Table 5
+side_ignored,23,ヌ型,97.83,thesis,Table 5
+side_ignored,02,イ型,97.00,thesis,Table 5
+side_ignored,26,ヒ型,97.00,thesis,Table 5
+side_ignored,52,握り拳平,20.00,thesis,Table 5
+side_ignored,61,Q型,25.00,thesis,Table 5
+side_ignored,30,マ型,30.00,thesis,Table 5
+side_ignored,57,屋根型,30.00,thesis,Table 5
+side_ignored,45,一型,37.00,thesis,Table 5
