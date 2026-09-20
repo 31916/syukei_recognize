@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/
+*.keras
+*.h5
+.DS_Store
+Thumbs.db

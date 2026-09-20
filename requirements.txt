@@ -1,0 +1,9 @@
+# Python 3.10-3.12. Keep the original MediaPipe Solutions API available.
+mediapipe==0.10.21
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+scikit-learn==1.6.1
+tensorflow==2.18.1
+# MediaPipe dependencies constrained to the NumPy 1.x / TensorFlow 2.18 range.
+jax==0.4.35
+jaxlib==0.4.35
